@@ -1,0 +1,9 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="18.8192" height="33.1967" viewBox="0 0 18.8192 33.1967" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path id="Progress" d="M11.7158 4.20524C13.2175 2.66591 14.8264 1.26162 16.5245 0L18.8192 3.35904C17.3104 4.48432 15.8802 5.73498 14.5442 7.10438C7.79286 14.0245 4.00001 23.4102 4.00001 33.1967H0C1.60187e-06 22.3228 4.21428 11.8942 11.7158 4.20524Z" fill="url(#paint0_linear_0_492)"/>
+<defs>
+<linearGradient id="paint0_linear_0_492" x1="2.33079" y1="33.5386" x2="18.3217" y2="2.44172" gradientUnits="userSpaceOnUse">
+<stop stop-color="#FF5E4C"/>
+<stop offset="1" stop-color="#FFD435"/>
+</linearGradient>
+</defs>
+</svg>

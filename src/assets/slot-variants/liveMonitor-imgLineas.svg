@@ -1,0 +1,8 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="182" height="133" viewBox="0 0 182 133" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Lineas">
+<path id="eje y" d="M3.24631e-08 0.5H182" stroke="#BFBFBF" stroke-dasharray="6 6"/>
+<path id="eje y_2" d="M3.24631e-08 44.5H182" stroke="#BFBFBF" stroke-dasharray="6 6"/>
+<path id="eje y_3" d="M3.24631e-08 88.5H182" stroke="#BFBFBF" stroke-dasharray="6 6"/>
+<path id="base" d="M3.24631e-08 132.5L182 132.5" stroke="#BFBFBF"/>
+</g>
+</svg>

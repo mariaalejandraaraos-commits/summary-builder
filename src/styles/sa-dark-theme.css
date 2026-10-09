@@ -1,0 +1,350 @@
+/*
+ * Seller Assistant Studio — Dark theme v1.1.0
+ *
+ * Activacion global:  <html data-sa-theme="dark">
+ * Activacion acotada: <section class="sa-theme" data-sa-theme="dark">
+ *
+ * Los tokens --sa-* son la API publica. Los --sa-ref-* son valores de
+ * referencia y no deberian consumirse directamente desde componentes.
+ */
+
+:root[data-sa-theme="dark"],
+.sa-theme[data-sa-theme="dark"] {
+  color-scheme: dark;
+
+  /* Color de referencia */
+  --sa-ref-blue-100: #e9f1ff;
+  --sa-ref-blue-200: #dee9ff;
+  --sa-ref-blue-300: #c6d8ff;
+  --sa-ref-blue-400: #a3bcfe;
+  --sa-ref-blue-500: #7a95ff;
+  --sa-ref-blue-600: #5c70fa;
+  --sa-ref-blue-700: #434ce4;
+  --sa-ref-blue-800: #353ac5;
+  --sa-ref-blue-900: #272c96;
+  --sa-ref-gray-100: #f5f6fa;
+  --sa-ref-gray-300: #d0d4e6;
+  --sa-ref-gray-400: #b5b9d4;
+  --sa-ref-gray-500: #9292b0;
+  --sa-ref-gray-700: #646587;
+  --sa-ref-gray-800: #3f415f;
+  --sa-ref-gray-900: #2c303e;
+  --sa-ref-navy-700: #172340;
+  --sa-ref-navy-800: #10192c;
+  --sa-ref-navy-900: #0f172a;
+  --sa-ref-black-900: #040407;
+
+  /* Superficies del Studio */
+  --sa-color-page: #0b1020;
+  --sa-color-header: #0d0d1b;
+  --sa-color-surface: var(--sa-ref-navy-900);
+  --sa-color-surface-subtle: var(--sa-ref-navy-800);
+  --sa-color-surface-raised: #181a26;
+  --sa-color-surface-strong: var(--sa-ref-black-900);
+  --sa-color-surface-hover: var(--sa-ref-navy-700);
+  --sa-color-overlay: rgb(4 4 7 / 72%);
+  --sa-color-canvas-start: #0b1020;
+  --sa-color-canvas-middle: #0f1b3a;
+  --sa-color-canvas-end: #111827;
+  --sa-canvas-background: radial-gradient(ellipse 58% 36% at 48% 94%, rgb(53 58 197 / 42%), transparent 70%), linear-gradient(105deg, var(--sa-color-canvas-start) 0%, var(--sa-color-canvas-middle) 55%, var(--sa-color-canvas-end) 100%);
+
+  /* Contenido */
+  --sa-color-text: var(--sa-ref-gray-100);
+  --sa-color-text-secondary: var(--sa-ref-gray-300);
+  --sa-color-text-muted: var(--sa-ref-gray-400);
+  --sa-color-text-quiet: var(--sa-ref-gray-500);
+  --sa-color-text-disabled: rgb(255 255 255 / 40%);
+  --sa-color-icon: var(--sa-ref-gray-300);
+  --sa-color-icon-accent: #718cf9;
+
+  /* Acciones y estados */
+  --sa-color-action: var(--sa-ref-blue-700);
+  --sa-color-action-hover: var(--sa-ref-blue-800);
+  --sa-color-action-active: var(--sa-ref-blue-900);
+  --sa-color-action-focus: var(--sa-ref-blue-600);
+  --sa-color-action-text: #ffffff;
+  --sa-color-selected-surface: #1b2755;
+  --sa-color-selected-border: #718cf9;
+  --sa-color-success: #00a650;
+  --sa-color-warning: #ff7733;
+  --sa-color-danger: #f23d4f;
+
+  /* Bordes */
+  --sa-color-divider: var(--sa-ref-gray-900);
+  --sa-color-border-subtle: var(--sa-ref-gray-800);
+  --sa-color-border: var(--sa-ref-gray-700);
+  --sa-color-border-strong: #434565;
+  --sa-color-border-focus: var(--sa-ref-blue-600);
+
+  /* Preview del producto: intencionalmente claro dentro del Studio oscuro */
+  --sa-color-preview-surface: #ffffff;
+  --sa-color-preview-surface-subtle: #f5f5f5;
+  --sa-color-preview-text: #282834;
+  --sa-color-preview-text-muted: #737373;
+  --sa-color-preview-border: #d0d4e6;
+
+  /* Tipografia */
+  --sa-font-family-base: "Proxima Nova", Arial, sans-serif;
+  --sa-font-weight-regular: 400;
+  --sa-font-weight-semibold: 600;
+  --sa-font-size-label: 12px;
+  --sa-font-size-body-small: 14px;
+  --sa-font-size-body: 16px;
+  --sa-font-size-title-small: 20px;
+  --sa-font-size-title: 24px;
+  --sa-font-size-display: 48px;
+  --sa-line-height-label: 15px;
+  --sa-line-height-body-small: 18px;
+  --sa-line-height-body: 20px;
+  --sa-line-height-title-small: 25px;
+  --sa-line-height-title: 30px;
+  --sa-line-height-display: 56px;
+
+  /* Compatibilidad tipográfica Andes Legacy.
+     Estos primitivos son la fuente única de la escala usada por el Studio;
+     los componentes deben preferir los alias semánticos --sa-type-*. */
+  --andes-font-family-proxima-nova: var(--sa-font-family-base);
+  --andes-font-weight-regular: var(--sa-font-weight-regular);
+  --andes-font-weight-semibold: var(--sa-font-weight-semibold);
+  --andes-font-letter-spacing-0: 0;
+  --andes-font-size-10: 10px;
+  --andes-font-size-12: 12px;
+  --andes-font-size-14: 14px;
+  --andes-font-size-16: 16px;
+  --andes-font-size-18: 18px;
+  --andes-font-size-20: 20px;
+  --andes-font-size-24: 24px;
+  --andes-font-size-28: 28px;
+  --andes-font-size-32: 32px;
+  --andes-font-size-40: 40px;
+  --andes-font-size-48: 48px;
+  --andes-font-size-56: 56px;
+  --andes-font-size-64: 64px;
+  --andes-font-line-height-12: 12px;
+  --andes-font-line-height-15: 15px;
+  --andes-font-line-height-17: 17px;
+  --andes-font-line-height-18: 18px;
+  --andes-font-line-height-20: 20px;
+  --andes-font-line-height-22: 22px;
+  --andes-font-line-height-24: 24px;
+  --andes-font-line-height-25: 25px;
+  --andes-font-line-height-30: 30px;
+  --andes-font-line-height-35: 35px;
+  --andes-font-line-height-40: 40px;
+  --andes-font-line-height-45: 45px;
+  --andes-font-line-height-48: 48px;
+  --andes-font-line-height-56: 56px;
+  --andes-font-line-height-66: 66px;
+  --andes-font-line-height-72: 72px;
+  --sa-type-label-size: var(--andes-font-size-12);
+  --sa-type-label-line-height: var(--andes-font-line-height-15);
+  --sa-type-label-weight: var(--andes-font-weight-semibold);
+  --sa-type-body-small-size: var(--andes-font-size-14);
+  --sa-type-body-small-line-height: var(--andes-font-line-height-18);
+  --sa-type-body-size: var(--andes-font-size-16);
+  --sa-type-body-line-height: var(--andes-font-line-height-20);
+  --sa-type-body-large-size: var(--andes-font-size-18);
+  --sa-type-body-large-line-height: var(--andes-font-line-height-24);
+  --sa-type-title-small-size: var(--andes-font-size-20);
+  --sa-type-title-small-line-height: var(--andes-font-line-height-25);
+  --sa-type-title-size: var(--andes-font-size-24);
+  --sa-type-title-line-height: var(--andes-font-line-height-30);
+  --sa-type-display-size: var(--andes-font-size-48);
+  --sa-type-display-line-height: var(--andes-font-line-height-56);
+  --sa-type-title-weight: var(--andes-font-weight-semibold);
+
+  /* Espaciado */
+  --sa-space-0: 0;
+  --sa-space-1: 4px;
+  --sa-space-2: 8px;
+  --sa-space-3: 12px;
+  --sa-space-4: 16px;
+  --sa-space-5: 20px;
+  --sa-space-6: 24px;
+  --sa-space-8: 32px;
+  --sa-space-10: 40px;
+  --sa-space-12: 48px;
+
+  /* Forma y elevacion */
+  --sa-radius-control: 8px;
+  --sa-radius-panel: 12px;
+  --sa-radius-card: 12px;
+  --sa-radius-preview: 20px;
+  --sa-radius-pill: 999px;
+  --sa-shadow-panel: 0 8px 24px rgb(4 4 7 / 24%);
+  --sa-shadow-focus: 0 0 0 2px var(--sa-color-page), 0 0 0 4px var(--sa-color-action-focus);
+  --sa-motion-fast: 120ms ease-out;
+
+  /* Controles compactos de las sidebars. Mantienen la misma UI en Builder,
+     drawers y Playground documental. */
+  --sa-control-height-compact: 32px;
+  --sa-control-padding-start: 6px;
+  --sa-control-padding-end: 30px;
+  --sa-control-chevron: right 6px center / 16px no-repeat;
+  --sa-control-background: var(--sa-color-surface-strong);
+  --sa-control-text: var(--sa-color-action-text);
+  --sa-control-divider-space: var(--sa-space-4);
+  --sa-switch-width: 35px;
+  --sa-switch-height: 20px;
+  --sa-switch-thumb-size: 20px;
+  --sa-switch-offset: 15px;
+  --sa-switch-focus-ring: var(--sa-color-selected-surface);
+
+  /* Component: Widget List. Estos valores pertenecen al preview claro del
+     componente y se comparten entre Builder, Anatomía y Playground. */
+  --sa-widget-list-surface: var(--sa-color-preview-surface);
+  --sa-widget-list-border: #dddddd;
+  --sa-widget-list-divider: #e5e5e5;
+  --sa-widget-list-heading: var(--sa-color-preview-text-muted);
+  --sa-widget-list-text: #282834;
+  --sa-widget-list-text-muted: #555555;
+  --sa-widget-list-radius: 8px;
+  --sa-widget-list-row-min-height: 60px;
+  --sa-widget-list-row-padding: 12px;
+  --sa-widget-list-icon-size: 32px;
+  --sa-widget-list-icon-gap: 12px;
+
+  /* Shell del asistente. Es la estructura reutilizada por Builder y las
+     fichas: su contenido interno se compone con renderers, no con variantes
+     visuales duplicadas. */
+  --sa-assistant-shell-width: 342px;
+  --sa-assistant-shell-height: 620px;
+  --sa-assistant-shell-radius: 20px;
+  --sa-assistant-shell-header-height: 64px;
+  --sa-assistant-shell-header-padding-x: 16px;
+  --sa-assistant-shell-composer-min-height: 56px;
+  --sa-assistant-shell-composer-radius: 28px;
+
+  /* Navegación global del Studio. */
+  --sa-header-height: 48px;
+  --sa-header-padding-x: 24px;
+  --sa-header-tabs-width: 640px;
+  --sa-header-tab-padding-x: 16px;
+  --sa-header-theme-gap: 20px;
+
+  /* Cards del catálogo de Biblioteca. */
+  --sa-library-card-border: var(--sa-color-border-strong);
+  --sa-library-card-surface: rgb(27 39 85 / 50%);
+  --sa-library-card-surface-hover: rgb(27 39 85 / 76%);
+  --sa-library-card-radius: 12px;
+  --sa-library-card-thumbnail-height: 235px;
+  --sa-library-card-thumbnail-padding: 24px;
+  --sa-library-card-content-min-height: 142px;
+  --sa-library-card-content-padding: 24px;
+  --sa-library-card-gap: 24px;
+
+  /* Primitivos de Biblioteca: catálogo y futura navegación de detalle. */
+  --sa-library-control-surface: var(--sa-color-header);
+  --sa-library-control-border: var(--sa-color-border);
+  --sa-library-control-focus: var(--sa-color-selected-border);
+  --sa-library-control-text: var(--sa-color-text-muted);
+  --sa-library-search-height: 32px;
+  --sa-library-search-radius: 16px;
+  --sa-library-choice-min-height: 28px;
+  --sa-library-choice-radius: 999px;
+  --sa-library-count-surface: var(--sa-color-selected-surface);
+  --sa-library-count-radius: 4px;
+
+  /* Alias de compatibilidad con el Playground actual */
+  --ax-color-blue-100: var(--sa-ref-blue-100);
+  --ax-color-blue-200: var(--sa-ref-blue-200);
+  --ax-color-blue-300: var(--sa-ref-blue-300);
+  --ax-color-blue-400: var(--sa-ref-blue-400);
+  --ax-color-blue-500: var(--sa-ref-blue-500);
+  --ax-color-blue-600: var(--sa-ref-blue-600);
+  --ax-color-blue-700: var(--sa-ref-blue-700);
+  --ax-color-blue-800: var(--sa-ref-blue-800);
+  --ax-color-blue-900: var(--sa-ref-blue-900);
+  --ax-color-gray-100: var(--sa-ref-gray-100);
+  --ax-color-gray-800: var(--sa-ref-gray-700);
+  --ax-color-gray-900: var(--sa-ref-gray-800);
+  --ax-color-dark-gray-200: #0d0d1b;
+  --sa-color-control-border: var(--sa-color-border);
+  --sa-color-panel-border: var(--sa-color-border-subtle);
+  --sidebar-surface: var(--sa-color-surface);
+  --sidebar-stroke: var(--sa-color-panel-border);
+  --sidebar-divider: var(--sa-color-divider);
+  --sidebar-control-stroke: var(--sa-color-control-border);
+  --sidebar-padding: var(--sa-space-6);
+}
+
+/* Recetas opcionales. Se aplican solo dentro de .sa-theme. */
+.sa-theme {
+  color: var(--sa-color-text);
+  background: var(--sa-color-page);
+  font-family: var(--sa-font-family-base);
+}
+
+.sa-theme .sa-panel {
+  color: var(--sa-color-text);
+  border: 1px solid var(--sa-color-border-subtle);
+  border-radius: var(--sa-radius-panel);
+  background: var(--sa-color-surface);
+  box-shadow: var(--sa-shadow-panel);
+}
+
+.sa-theme .sa-card {
+  padding: var(--sa-space-4);
+  color: var(--sa-color-text);
+  border: 1px solid var(--sa-color-border-subtle);
+  border-radius: var(--sa-radius-card);
+  background: var(--sa-color-surface-subtle);
+}
+
+.sa-theme .sa-button {
+  min-height: 40px;
+  padding: 0 var(--sa-space-4);
+  color: var(--sa-color-action-text);
+  border: 1px solid transparent;
+  border-radius: var(--sa-radius-control);
+  background: var(--sa-color-action);
+  font: 600 var(--sa-font-size-body-small)/var(--sa-line-height-body-small) var(--sa-font-family-base);
+  transition: background-color var(--sa-motion-fast);
+}
+
+.sa-theme .sa-button:hover { background: var(--sa-color-action-hover); }
+.sa-theme .sa-button:active { background: var(--sa-color-action-active); }
+
+.sa-theme .sa-button--secondary {
+  color: var(--sa-color-text);
+  border-color: var(--sa-color-border);
+  background: transparent;
+}
+
+.sa-theme .sa-button--secondary:hover { background: var(--sa-color-surface-hover); }
+
+.sa-theme .sa-input {
+  min-height: 40px;
+  padding: 0 var(--sa-space-3);
+  color: var(--sa-color-text);
+  border: 1px solid var(--sa-color-border);
+  border-radius: var(--sa-radius-control);
+  background: var(--sa-color-surface-strong);
+  font: 400 var(--sa-font-size-body-small)/var(--sa-line-height-body-small) var(--sa-font-family-base);
+}
+
+.sa-theme .sa-input::placeholder { color: var(--sa-color-text-quiet); }
+
+.sa-theme :is(.sa-button, .sa-input, a):focus-visible {
+  outline: none;
+  box-shadow: var(--sa-shadow-focus);
+}
+
+.sa-theme .sa-preview {
+  color-scheme: light;
+  color: var(--sa-color-preview-text);
+  border: 1px solid var(--sa-color-preview-border);
+  border-radius: var(--sa-radius-preview);
+  background: var(--sa-color-preview-surface);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sa-theme *,
+  .sa-theme *::before,
+  .sa-theme *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
