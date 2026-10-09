@@ -44,7 +44,7 @@ Una dirección que empieza por `file:///Users/...` abre un archivo de esta compu
 
 Flujo acordado para el equipo: conservar Grid como entrada y abrir el Builder conectado en otra pestaña. No reemplazar el HTML actual de Grid por un enlace hasta que exista y se haya probado la URL de la aplicación web.
 
-La primera versión privada también está [publicada en Grid](https://grid.adminml.com/d/01M46W63MKRRTKQ0S2VCEHMHKE/view). El [registro de publicación](docs/grid-publication.md) guarda el ID para subir las próximas versiones al mismo documento.
+La versión compartida también está [publicada en Grid](https://grid.adminml.com/d/01M46W63MKRRTKQ0S2VCEHMHKE/view). El [registro de publicación](docs/grid-publication.md) guarda el ID para subir las próximas versiones al mismo documento.
 
 ## Tema visual
 

@@ -2,9 +2,9 @@
 
 - Documento: [Summary Builder · Prototipo](https://grid.adminml.com/d/01M46W63MKRRTKQ0S2VCEHMHKE/view)
 - ID de Grid: `01M46W63MKRRTKQ0S2VCEHMHKE`
-- Visibilidad: privada
+- Visibilidad: pública (toda MELI, incluidas cuentas externas `ext_`)
 - Primera publicación: 2026-10-05
-- Versión actual registrada: 8 (2026-10-05)
+- Versión actual registrada: 9 (2026-10-09)
 - Fuente local: [`../summary-builder.html`](../summary-builder.html)
 
 ## Versiones
@@ -17,6 +17,7 @@
 6. Versión 6: cada dato de Value basic permite elegir el color del indicador. Icon ofrece azul, verde, naranja y rojo; Dot suma gris. Las formas internas de los iconos siguen las variantes originales de Figma.
 7. Versión 7: la referencia de Figma muestra el nombre legible del archivo y el ID del nodo; se verificaron la vista previa, el enlace en el HTML descargado y la restauración de la sesión.
 8. Versión 8: el enlace a un diseño de Figma se muestra como vista incrustada dentro del slot y en el HTML compartible. Se conserva el acceso al archivo completo. La vista en línea requiere conexión y permisos de Figma.
+9. Versión 9: se cambió la visibilidad del documento a pública, sin reemplazar el archivo HTML.
 
 Las próximas publicaciones deben actualizar este mismo documento como una versión nueva. Antes de subir una versión, consultar la versión actual de Grid y usarla como condición de actualización para evitar sobrescribir cambios realizados allí por otra persona.
 
