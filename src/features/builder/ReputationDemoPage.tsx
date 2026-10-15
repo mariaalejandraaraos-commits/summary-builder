@@ -81,6 +81,7 @@ type DemoSlot = {
   figmaImageSource: 'api' | 'upload' | ''
   prompt: string
   promptApplied: boolean
+  usesLibraryVariant: boolean
   sketch: PromptSketch | null
 }
 
@@ -95,7 +96,14 @@ type DemoConfig = {
   placement: TemplatePlacement
 }
 
-type GuidedGoal = 'metric' | 'chart' | 'money' | 'list' | 'news' | 'other'
+type LocalAiProposal = {
+  title: string
+  cta: string
+  rationale?: string
+  slots: { role?: string; variant: string; label: string; value: string; description: string }[]
+}
+
+type GuidedGoal = 'metric' | 'chart' | 'money' | 'news' | 'other'
 type GuidedAnswers = {
   goal: GuidedGoal | null
   subject: string
@@ -112,7 +120,6 @@ const guidedGoals: { id: GuidedGoal; label: string; description: string }[] = [
   { id: 'metric', label: 'Mostrar un dato o métrica', description: 'Destacar un valor y darle contexto.' },
   { id: 'chart', label: 'Mostrar una tendencia o gráfico', description: 'Ver cómo cambia un dato en el tiempo.' },
   { id: 'money', label: 'Mostrar un monto', description: 'Ingresos, saldo u otro valor monetario.' },
-  { id: 'list', label: 'Mostrar una lista', description: 'Reunir elementos que necesitan atención.' },
   { id: 'news', label: 'Comunicar una novedad', description: 'Presentar algo nuevo o importante.' },
   { id: 'other', label: 'Otra idea', description: 'Describir libremente qué quieres mostrar.' },
 ]
@@ -188,7 +195,7 @@ function defaultSlot(variant: SlotVariant, enabled = false): DemoSlot {
     { value: '0%', label: 'Label', status: 'icon' as const, color: 'green' as const },
     { value: '0%', label: 'Label', status: 'icon' as const, color: 'green' as const },
   ]
-  const common = { enabled, source: 'library' as const, variant, tone: 'green' as const, columns: 1 as const, metrics, figmaUrl: '', figmaImageDataUrl: '', figmaImageSource: '' as const, prompt: '', promptApplied: false, sketch: null, showProduct: true, productName: 'Varias publicaciones', productCount: '+4' }
+  const common = { enabled, source: 'library' as const, variant, tone: 'green' as const, columns: 1 as const, metrics, figmaUrl: '', figmaImageDataUrl: '', figmaImageSource: '' as const, prompt: '', promptApplied: false, usesLibraryVariant: false, sketch: null, showProduct: true, productName: 'Varias publicaciones', productCount: '+4' }
   if (variant === 'reputation') return { ...common, label: 'MercadoLíder Platinum', value: '', description: '' }
   if (variant === 'gauge') return { ...common, label: 'Texto', value: 'Text link', description: 'Alto' }
   if (variant === 'news') return { ...common, label: 'NOVEDAD', value: 'Explora las herramientas de nuestro editor y transforma imágenes.', description: 'Usaremos inteligencia artificial para transformar tus imágenes y aumentar las ventas de forma automática, garantizando resultados efectivos.' }
@@ -218,7 +225,11 @@ function createConfig(prefill: boolean): DemoConfig {
 }
 
 function variantName(variant: SlotVariant) { return variantNames[variant] }
-function slotContentName(slot: DemoSlot) { return slot.source === 'figma' ? 'Diseño de Figma' : slot.source === 'prompt' ? 'Idea por prompt' : variantName(slot.variant) }
+function slotContentName(slot: DemoSlot) {
+  if (slot.source === 'figma') return 'Diseño de Figma'
+  if (slot.source === 'prompt' && slot.usesLibraryVariant) return `${variantName(slot.variant)} · propuesta de Mi idea`
+  return slot.source === 'prompt' ? 'Idea por prompt' : variantName(slot.variant)
+}
 
 function figmaNodeReference(value: string) {
   try {
@@ -375,17 +386,108 @@ function buildPromptSketch(prompt: string): PromptSketch {
 
 type CardDraftResult = { config: DemoConfig; warningCount: number } | { error: string }
 
+function fitCardText(value: string, limit: number, fallback: string) {
+  const text = value.replace(/\s+/g, ' ').trim() || fallback
+  return text.length <= limit ? text : `${text.slice(0, Math.max(0, limit - 1)).trimEnd()}…`
+}
+
+function buildTaskDraft(prompt: string, normalized: string): CardDraftResult {
+  const config = createConfig(false)
+  const isListings = /publicacion|anuncio|catalogo/.test(normalized)
+  const isSales = /venta|pedido|envio|despacho|posventa/.test(normalized)
+  const title = isListings ? 'Pendientes en tus publicaciones' : isSales ? 'Pendientes en tus ventas' : 'Pendientes para revisar'
+  const cta = isListings ? 'Ver publicaciones' : isSales ? 'Ver ventas' : 'Ver pendientes'
+  const taskCount = Number(prompt.match(/\b(\d{1,2})\s+(?:tareas?|pendientes?|publicaciones?|pedidos?|envios?)/i)?.[1])
+  const count = Number.isFinite(taskCount) && taskCount > 0 ? taskCount : 3
+  const urgent = /urgente|hoy|critica|critico|reputacion|reclamo/.test(normalized)
+  const category = isListings
+    ? /stock/.test(normalized) ? 'Stock y disponibilidad' : /pausad/.test(normalized) ? 'Publicaciones pausadas' : 'Publicaciones para revisar'
+    : isSales
+      ? /envio|despacho/.test(normalized) ? 'Envíos por resolver' : /posventa|reclamo/.test(normalized) ? 'Posventa para atender' : 'Ventas para revisar'
+      : 'Tareas para resolver'
+  const detail = isListings
+    ? /stock/.test(normalized) ? 'Actualiza el stock de tus publicaciones' : /pausad/.test(normalized) ? 'Revisa las publicaciones pausadas' : 'Revisa el estado de tus publicaciones'
+    : isSales
+      ? /envio|despacho/.test(normalized) ? 'Despacha los envíos pendientes' : /posventa|reclamo/.test(normalized) ? 'Responde las consultas de posventa' : 'Revisa las ventas que requieren atención'
+      : 'Revisa las tareas que requieren atención'
+  const visibleTasks = Math.min(count, 4)
+  const sketch: PromptSketch = {
+    kind: 'list',
+    andesPattern: 'news',
+    title: fitCardText(category, 32, 'Pendientes para revisar'),
+    cardTitle: title,
+    cta: fitCardText(cta, 32, 'Ver pendientes'),
+    interpretation: 'Card de tareas · estructura fija · contenido editable',
+    value: '',
+    change: '',
+    period: '',
+    support: urgent ? 'Incluye una tarea urgente para resolver hoy.' : 'Las tareas no urgentes se resuelven dentro del flujo diario.',
+    direction: urgent ? 'down' : 'up',
+    gaugeValue: 0,
+    items: Array.from({ length: visibleTasks }, (_, index) => ({
+      label: index === 0 ? detail : `Tarea pendiente ${index + 1}`,
+      value: index === 0 && urgent ? `${count} urgente${count === 1 ? '' : 's'}` : String(Math.max(1, count - index)),
+    })),
+  }
+  const warnings: string[] = []
+  if (!isListings && !isSales) warnings.push('Falta definir si las tareas corresponden a publicaciones o a ventas.')
+  if (!/\b\d+\b/.test(prompt)) warnings.push('Falta la cantidad real de tareas; se muestra un ejemplo editable.')
+  if (/categoria nueva|nueva categoria/.test(normalized)) warnings.push('La nueva categoría debe validarse contra la Matriz de tareas de Summary.')
+  if (count > 4) warnings.push('Se muestran como máximo cuatro tareas por categoría; el resto debe quedar disponible al expandirla.')
+  config.ideaPrompt = prompt
+  config.title = title
+  config.footer = sketch.cta
+  config.autoTitle = true
+  config.autoFooter = true
+  config.order = ['slot-1']
+  config.slots['slot-1'] = { ...defaultSlot('news', true), source: 'prompt', prompt, promptApplied: true, sketch }
+  return { config, warningCount: warnings.length }
+}
+
+function buildGeneralDraft(prompt: string): CardDraftResult {
+  const config = createConfig(false)
+  const sketch = buildPromptSketch(prompt)
+  const warnings: string[] = []
+  const rawTitle = sketch.cardTitle === 'Novedades' ? 'Novedades' : sketch.cardTitle || 'Nueva card'
+  const rawCta = sketch.cta || 'Ver detalle'
+  if (!/\b(hoy|ayer|semana|mes|d[ií]as|periodo|per[ií]odo)\b/i.test(prompt) && (sketch.kind === 'metric' || sketch.kind === 'chart')) warnings.push('Falta el período de referencia.')
+  if (!/\b(\d|\$|porcentaje|tasa|monto|valor|cantidad)\b/i.test(prompt) && (sketch.kind === 'metric' || sketch.kind === 'chart')) warnings.push('Falta el valor principal; se muestra un campo editable.')
+  if (rawTitle.length > 32) warnings.push('El título se ajustó al máximo de 32 caracteres.')
+  if (rawCta.length > 32) warnings.push('El CTA se ajustó al máximo de 32 caracteres.')
+  sketch.cardTitle = fitCardText(rawTitle, 32, 'Nueva card')
+  sketch.cta = fitCardText(rawCta, 32, 'Ver detalle')
+  config.ideaPrompt = prompt
+  config.title = sketch.cardTitle
+  config.footer = sketch.cta
+  config.autoTitle = true
+  config.autoFooter = true
+  config.order = ['slot-1']
+  const variant: SlotVariant = sketch.kind === 'message' ? 'news' : sketch.kind === 'gauge' ? 'gauge' : 'value'
+  const slot = defaultSlot(variant, true)
+  config.slots['slot-1'] = {
+    ...slot,
+    source: 'prompt',
+    prompt,
+    promptApplied: true,
+    usesLibraryVariant: true,
+    sketch,
+    label: variant === 'news' ? 'NOVEDAD' : sketch.title,
+    value: variant === 'news' ? sketch.title : sketch.value || 'Dato pendiente',
+    description: variant === 'news' ? sketch.support : [sketch.period, sketch.support].filter(Boolean).join(' · '),
+  }
+  return { config, warningCount: warnings.length }
+}
+
 function buildCardDraft(prompt: string, alternativeIndex = 0): CardDraftResult {
   const normalized = prompt.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
   const isFollowers = /mi pagina|seguidores|comunidad/.test(normalized)
   const isMetric = /ventas|ingresos|facturacion|monto|saldo|metrica|dato/.test(normalized)
+  // "Catálogo" también aparece en pedidos de métricas (por ejemplo, para decidir dónde reforzarlo).
+  // Solo activa la estructura fija de tareas si hay una señal concreta de pendiente o gestión operativa.
+  const isTask = /tareas?|pendientes?|publicaciones?|anuncios?|pedidos?|envios?|despachos?|posventa|reclamos?|stock\s+(?:bajo|sin|agotado)|publicaciones?\s+(?:pausadas|para revisar)/.test(normalized)
   const variation = Math.abs(alternativeIndex) % 3
-  if (!isFollowers && /tareas?|pendientes?|publicaciones?|pedidos?/.test(normalized)) {
-    return { error: 'Esta demo todavía no genera cards de tareas: su estructura es fija en el Guideline. Prueba con “Mi página” o con una métrica.' }
-  }
-  if (!isFollowers && !isMetric) {
-    return { error: 'Para esta primera demo, describe una card de “Mi página” o una métrica de ventas, ingresos o saldo.' }
-  }
+  if (isTask) return buildTaskDraft(prompt, normalized)
+  if (!isFollowers && !isMetric) return buildGeneralDraft(prompt)
 
   const config = createConfig(false)
   config.ideaPrompt = prompt
@@ -399,6 +501,25 @@ function buildCardDraft(prompt: string, alternativeIndex = 0): CardDraftResult {
   })
   const add = (id: SlotId, sketch: PromptSketch) => {
     config.slots[id] = { ...defaultSlot(sketch.andesPattern, true), source: 'prompt', prompt, promptApplied: true, sketch }
+    if (!config.order.includes(id)) config.order.push(id)
+  }
+  const addLibrary = (id: SlotId, variant: SlotVariant, sketch: PromptSketch) => {
+    const slot = defaultSlot(variant, true)
+    const isGraphic = variant === 'dataGraphic'
+    const isValue = variant === 'value'
+    const isNews = variant === 'news'
+    const isRecommendation = variant === 'recommendationCard'
+    config.slots[id] = {
+      ...slot,
+      source: 'prompt',
+      prompt,
+      promptApplied: true,
+      usesLibraryVariant: true,
+      sketch,
+      label: isNews ? 'NOVEDAD' : isRecommendation ? sketch.title : isValue ? sketch.title : sketch.value || sketch.title,
+      value: isNews || isRecommendation ? sketch.support || sketch.title : isGraphic ? sketch.change || 'Dato comparable pendiente' : sketch.value || 'Dato pendiente',
+      description: isRecommendation ? sketch.cta : isGraphic ? [sketch.period || 'Inicio', 'Actual'].join(' · ') : [sketch.period, sketch.support].filter(Boolean).join(' · '),
+    }
     if (!config.order.includes(id)) config.order.push(id)
   }
 
@@ -419,7 +540,7 @@ function buildCardDraft(prompt: string, alternativeIndex = 0): CardDraftResult {
     main.interpretation = variation === 1 ? 'Tendencia · seguidores' : variation === 2 ? 'Métrica destacada · seguidores' : 'Dato principal · seguidores'
     if (!count) warnings.push('Falta la cantidad total de seguidores.')
     if (!weak && !strong) warnings.push('Falta definir el estado de seguidores.')
-    add('slot-1', main)
+    addLibrary('slot-1', mainKind === 'followers' ? 'gauge' : mainKind === 'chart' ? 'dataGraphic' : 'value', main)
 
     const days = prompt.match(/(?:ultimos|últimos)\s+(\d+)\s+dias/i)?.[1] || '30'
     const newFollowers = prompt.match(/\b(\d[\d.,]*)\s+seguidores\s+nuevos\b/i)?.[1]
@@ -439,7 +560,7 @@ function buildCardDraft(prompt: string, alternativeIndex = 0): CardDraftResult {
       const recommendation = base('recommendation', hasDiscount ? 'Aumenta tu comunidad creando descuentos' : variation === 1 ? 'Activa tu comunidad' : 'Convierte seguidores en compradores', config.title, hasDiscount ? 'Crear cupón' : 'Ver oportunidades')
       recommendation.support = hasDiscount ? 'Ofrece un cupón exclusivo y convierte visitas en seguidores.' : variation === 1 ? 'Comparte beneficios para atraer nuevos seguidores.' : 'Revisa acciones para impulsar la primera compra.'
       recommendation.interpretation = 'Recomendación contextual · comunidad'
-      add('slot-3', recommendation)
+      addLibrary('slot-3', 'recommendationCard', recommendation)
     }
   } else {
     const isIncome = /ingresos|facturacion|monto|saldo/.test(normalized)
@@ -450,28 +571,111 @@ function buildCardDraft(prompt: string, alternativeIndex = 0): CardDraftResult {
     config.footer = isIncome ? 'Ver movimientos' : isSales ? 'Ver ventas' : 'Ver detalle'
     const currency = prompt.match(/(?:\$|USD\s*)\s*\d[\d.,]*/i)?.[0]
     const percent = prompt.match(/[+−-]?\d+(?:[.,]\d+)?\s*%/)?.[0]
-    const directCount = prompt.match(/\b(\d[\d.,]*)\s+(?:ventas|ingresos)\b/i)?.[1]
-    const mainKind: SketchKind = variation === 1 ? 'chart' : 'metric'
-    const mainTitle = variation === 1 ? `Evolución de ${subject.toLowerCase()}` : period === 'Hoy' ? `${subject} de hoy` : subject
-    const main = base(mainKind, mainTitle, config.title, config.footer)
+    const directCount = prompt.match(/\b(\d[\d.,]*)\s+(?:ventas?|productos?|unidades?|pedidos?|ingresos?)\b/i)?.[1]
+    const main = base('metric', period === 'Hoy' ? `${subject} de hoy` : subject, config.title, config.footer)
     main.value = currency?.replace(/\s+/g, ' ').trim() || directCount || (/(?:porcentaje|tasa)/.test(normalized) ? percent : '') || 'Dato pendiente'
-    main.change = percent && currency ? percent.replace(/\s+/g, '') : ''
+    main.change = percent ? percent.replace(/\s+/g, '') : ''
     main.period = period
     main.support = /ayer/.test(normalized) ? 'vs. ayer' : ''
     main.direction = /baj|caid|disminu/.test(normalized) || main.change.startsWith('-') || main.change.startsWith('−') ? 'down' : 'up'
-    main.interpretation = variation === 1 ? 'Tendencia de la métrica' : 'Métrica principal'
+    main.interpretation = 'Información principal'
     if (main.value === 'Dato pendiente') warnings.push('Falta el valor de la métrica.')
     if (period === 'Período por definir') warnings.push('Falta el período de la métrica.')
-    add('slot-1', main)
+
+    const trend = base('chart', `Evolución de ${subject.toLowerCase()}`, config.title, config.footer)
+    trend.value = main.value
+    trend.change = main.change
+    trend.period = main.period
+    trend.support = main.support
+    trend.direction = main.direction
+    trend.interpretation = 'Información complementaria · tendencia'
+
+    // La card se compone por función de cada slot: dato principal, contexto y sugerencia opcional.
+    if (variation === 1) {
+      addLibrary('slot-1', 'dataGraphic', trend)
+      addLibrary('slot-2', 'value', main)
+    } else {
+      addLibrary('slot-1', 'value', main)
+      addLibrary('slot-2', 'dataGraphic', trend)
+    }
     if (variation === 2) {
       const recommendation = base('recommendation', isIncome ? 'Planifica tus próximos movimientos' : isSales ? 'Detecta qué impulsó tus ventas' : 'Profundiza en este resultado', config.title, config.footer)
       recommendation.support = isIncome ? 'Compara ingresos y saldos antes de decidir el próximo paso.' : isSales ? 'Revisa los productos y canales con mayor crecimiento.' : 'Consulta el detalle para entender los cambios del período.'
       recommendation.interpretation = 'Recomendación contextual · siguiente paso'
-      add('slot-2', recommendation)
+      addLibrary('slot-3', 'recommendationCard', recommendation)
     }
   }
 
   return { config, warningCount: warnings.length }
+}
+
+function isTaskIdea(prompt: string) {
+  const normalized = prompt.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+  return /tareas?|pendientes?|publicaciones?|anuncios?|pedidos?|envios?|despachos?|posventa|reclamos?|stock\s+(?:bajo|sin|agotado)|publicaciones?\s+(?:pausadas|para revisar)/.test(normalized)
+}
+
+function isSlotVariant(value: string): value is SlotVariant {
+  return Object.prototype.hasOwnProperty.call(variantNames, value)
+}
+
+function localSketchKind(variant: SlotVariant): SketchKind {
+  if (variant === 'dataGraphic' || variant === 'liveMonitor') return 'chart'
+  if (variant === 'gauge') return 'gauge'
+  if (variant === 'reputation') return 'status'
+  if (variant === 'recommendationCard') return 'recommendation'
+  if (variant === 'news') return 'message'
+  return 'metric'
+}
+
+function buildLocalAiDraft(prompt: string, proposal: LocalAiProposal): CardDraftResult | null {
+  const slots = proposal.slots.filter((slot) => isSlotVariant(slot.variant)).slice(0, allSlotIds.length)
+  if (!slots.length) return null
+  const config = createConfig(false)
+  config.ideaPrompt = prompt
+  config.title = fitCardText(proposal.title, 32, 'Nueva card')
+  config.footer = fitCardText(proposal.cta, 32, 'Ver detalle')
+  config.autoTitle = true
+  config.autoFooter = true
+  config.order = []
+  let warningCount = 0
+  slots.forEach((proposalSlot, index) => {
+    const id = allSlotIds[index]
+    const variant = proposalSlot.variant as SlotVariant
+    const defaults = defaultSlot(variant, true)
+    const kind = localSketchKind(variant)
+    const label = proposalSlot.label.trim() || defaults.label
+    const value = proposalSlot.value.trim() || defaults.value
+    const description = proposalSlot.description.trim() || defaults.description
+    if (/dato por definir/i.test(`${label} ${value} ${description}`)) warningCount += 1
+    const sketch: PromptSketch = {
+      kind,
+      andesPattern: andesPatternForSketch(kind),
+      title: label,
+      cardTitle: config.title,
+      cta: config.footer,
+      interpretation: `Propuesta local · ${proposalSlot.role || (index === 0 ? 'principal' : 'complementario')}`,
+      value,
+      change: variant === 'dataGraphic' ? value : '',
+      period: description,
+      support: description,
+      direction: /baj|ca[ií]d|disminu|−|-/.test(`${label} ${value} ${description}`) ? 'down' : 'up',
+      gaugeValue: 0,
+      items: [],
+    }
+    config.slots[id] = {
+      ...defaults,
+      source: 'prompt',
+      prompt,
+      promptApplied: true,
+      usesLibraryVariant: true,
+      sketch,
+      label,
+      value,
+      description,
+    }
+    config.order.push(id)
+  })
+  return { config, warningCount }
 }
 
 function draftWarnings(config: DemoConfig) {
@@ -487,6 +691,38 @@ function draftWarnings(config: DemoConfig) {
   return warnings
 }
 
+type CardReadiness = {
+  phase: 'draft' | 'review' | 'ready'
+  label: string
+  detail: string
+  issues: string[]
+  canReview: boolean
+  canShare: boolean
+}
+
+function getCardReadiness(config: DemoConfig): CardReadiness {
+  const hasContent = config.order.some((id) => config.slots[id].enabled)
+  const issues = [
+    ...(!hasContent ? ['Agrega contenido principal.'] : []),
+    ...(!config.title.trim() ? ['Define el título de la card.'] : []),
+    ...(!config.footer.trim() ? ['Define la acción principal.'] : []),
+    ...draftWarnings(config),
+  ]
+  const canReview = hasContent && Boolean(config.title.trim()) && Boolean(config.footer.trim())
+  if (!canReview) return { phase: 'draft', label: 'Borrador en construcción', detail: issues[0] || 'Completa la estructura para continuar.', issues, canReview: false, canShare: false }
+  if (issues.length > 0) return { phase: 'review', label: 'Listo para revisar', detail: `Faltan ${issues.length} dato${issues.length === 1 ? '' : 's'} antes de compartir.`, issues, canReview: true, canShare: false }
+  return { phase: 'ready', label: 'Listo para compartir', detail: 'Contenido, título y acción están completos para esta propuesta.', issues: [], canReview: true, canShare: true }
+}
+
+function getMobileChecks(config: DemoConfig, readiness: CardReadiness) {
+  return [
+    { label: 'Título dentro del límite de 32 caracteres', complete: Boolean(config.title.trim()) && config.title.trim().length <= 32 },
+    { label: 'Acción dentro del límite de 32 caracteres', complete: Boolean(config.footer.trim()) && config.footer.trim().length <= 32 },
+    { label: 'No hay datos pendientes en la propuesta', complete: readiness.canShare },
+    { label: 'La card usa hasta tres slots', complete: config.order.length <= allSlotIds.length },
+  ]
+}
+
 function guidedPrompt(answers: GuidedAnswers) {
   const subject = answers.subject.trim()
   const context = answers.context.trim()
@@ -494,7 +730,6 @@ function guidedPrompt(answers: GuidedAnswers) {
     case 'metric': return `Mostrar una métrica${subject ? ` de ${subject}` : ''} para ${answers.period.toLowerCase()}.${answers.value.trim() ? ` Valor ilustrativo: ${answers.value.trim()}.` : ''} ${context}`.trim()
     case 'chart': return `Mostrar un gráfico de ${subject || 'un dato'} para ${answers.period.toLowerCase()}.${answers.value.trim() ? ` Valor ilustrativo: ${answers.value.trim()}.` : ''} ${context}`.trim()
     case 'money': return `Mostrar un monto de ${subject || 'dinero'} para ${answers.period.toLowerCase()}.${answers.value.trim() ? ` Monto ilustrativo: ${answers.value.trim()}.` : ''} ${context}`.trim()
-    case 'list': return `Mostrar una lista de ${subject || 'elementos por revisar'}.`
     case 'news': return `Mostrar una novedad: ${subject || 'información relevante para el seller'}.${context ? ` ${context}` : ''}`
     case 'other': return subject || 'Mostrar información relevante para el seller.'
     default: return ''
@@ -535,13 +770,6 @@ function guidedConfig(answers: GuidedAnswers): DemoConfig {
     sketch.value = answers.value.trim() || '$ 1.248.500'
     sketch.support = context || (answers.period === 'Hoy' ? 'vs. ayer' : 'vs. período anterior')
     sketch.interpretation = 'Monto destacado'
-  } else if (answers.goal === 'list') {
-    sketch.kind = 'list'
-    sketch.title = subject || 'Elementos por revisar'
-    sketch.cardTitle = 'Lista'
-    sketch.cta = 'Ver detalle'
-    sketch.interpretation = 'Lista de elementos'
-    sketch.items = [{ label: 'Por revisar', value: '3' }, { label: 'En seguimiento', value: '2' }, { label: 'Completados', value: '1' }]
   } else if (answers.goal === 'news') {
     sketch.kind = 'message'
     sketch.title = subject || 'Una novedad para tu negocio'
@@ -609,7 +837,6 @@ function GuidedStart({ onCreate, onBlank, onOpenLibrary }: { onCreate: (config: 
             <label className="guided-start__field">{answers.goal === 'money' ? 'Monto ilustrativo (opcional)' : 'Valor ilustrativo (opcional)'}<input value={answers.value} onChange={(event) => update({ value: event.target.value })} placeholder={answers.goal === 'money' ? '$ 1.248.500' : '1.248'} /></label>
             <label className="guided-start__field">¿Qué comparación o contexto importa? (opcional)<input value={answers.context} onChange={(event) => update({ context: event.target.value })} placeholder="Ej.: frente al período anterior" /></label>
           </>}
-          {answers.goal === 'list' && <label className="guided-start__field">¿Qué elementos quieres listar?<input value={answers.subject} onChange={(event) => update({ subject: event.target.value })} placeholder="Ej.: pedidos para revisar" /></label>}
           {answers.goal === 'news' && <><label className="guided-start__field">¿Qué quieres comunicar?<input value={answers.subject} onChange={(event) => update({ subject: event.target.value })} placeholder="Ej.: una nueva herramienta para vender" /></label><label className="guided-start__field">¿Qué detalle ayuda a entenderlo? (opcional)<input value={answers.context} onChange={(event) => update({ context: event.target.value })} placeholder="Ej.: ya está disponible para tu negocio" /></label></>}
           {answers.goal === 'other' && <label className="guided-start__field">Describe tu idea (opcional)<textarea rows={4} value={answers.subject} onChange={(event) => update({ subject: event.target.value })} placeholder="Ej.: mostrar el estado de un objetivo" /></label>}
         </div>}
@@ -692,8 +919,8 @@ function MetricColorControl({ color, status, label, onChange }: { color: MetricC
 function SlotPreviewContent({ slot, isGenerating = false, generationStep = 'analyzing' }: { slot: DemoSlot; isGenerating?: boolean; generationStep?: 'analyzing' | 'assembling' }) {
   if (slot.source === 'figma') return <span className="reputation-demo__figma-preview"><span className="reputation-demo__figma-mark" aria-hidden="true">F</span><strong>Diseño de Figma</strong><small>Agrega el link desde Propiedades</small></span>
 
-  if (slot.source === 'prompt') {
-    if (isGenerating) return <span className="reputation-demo__prompt-loading" role="status"><span className="reputation-demo__spinner" aria-hidden="true" /><strong>{generationStep === 'analyzing' ? 'Interpretando tu idea…' : 'Armando el boceto…'}</strong><small>Usamos tu idea y un patrón de la Librería como referencia.</small></span>
+  if (slot.source === 'prompt' && !slot.usesLibraryVariant) {
+    if (isGenerating) return <span className="reputation-demo__prompt-loading" role="status"><span className="reputation-demo__spinner" aria-hidden="true" /><strong>{generationStep === 'analyzing' ? 'Interpretando tu idea…' : 'Armando la card…'}</strong><small>Usamos patrones de la Librería y reglas locales de Summary.</small></span>
     if (!slot.promptApplied || !slot.sketch) return <span className="reputation-demo__source-placeholder">Describe tu idea en Propiedades</span>
     const sketch = slot.sketch
     if (sketch.kind === 'followers') return <span className="reputation-demo__prompt-preview reputation-demo__followers">
@@ -743,7 +970,7 @@ function ContextCardPreview({ config, className = '' }: { config: DemoConfig; cl
         return <div key={id} className="reputation-demo__drop-zone">
           {slot.source === 'figma' && slot.figmaImageDataUrl
             ? <div className="reputation-demo__filled-slot reputation-demo__filled-slot--figma"><div className="reputation-demo__figma-render"><img src={slot.figmaImageDataUrl} alt={`Diseño de Figma en Slot ${slotNumber}`} /></div></div>
-            : <div className={`reputation-demo__filled-slot reputation-demo__filled-slot--${slot.source === 'library' ? slot.variant : slot.source}`} data-tone={slot.tone}><SlotPreviewContent slot={slot} /></div>}
+            : <div className={`reputation-demo__filled-slot reputation-demo__filled-slot--${slot.source === 'library' || slot.usesLibraryVariant ? slot.variant : slot.source}`} data-tone={slot.tone}><SlotPreviewContent slot={slot} /></div>}
         </div>
       })}
     </div>
@@ -788,13 +1015,25 @@ export function ReputationDemoPage({ prefill = false, onOpenLibrary }: { prefill
   const [generationStep, setGenerationStep] = useState<'analyzing' | 'assembling'>('analyzing')
   const [generatingAlternative, setGeneratingAlternative] = useState(false)
   const [ideaFeedbackOpen, setIdeaFeedbackOpen] = useState(false)
+  const [localAiReady, setLocalAiReady] = useState(false)
   const generationTimers = useRef<number[]>([])
+  const generationRequest = useRef(0)
   const ideaAlternativeIndex = useRef(0)
   const ideaPromptRef = useRef<HTMLTextAreaElement | null>(null)
   const stageHeadingRef = useRef<HTMLHeadingElement | null>(null)
   const contextExportRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => () => { generationTimers.current.forEach(window.clearTimeout) }, [])
+
+  useEffect(() => {
+    if (window.location.protocol === 'file:') return
+    let active = true
+    void fetch('/api/local-ai/status')
+      .then((response) => response.ok ? response.json() as Promise<{ available?: boolean }> : null)
+      .then((status) => { if (active) setLocalAiReady(Boolean(status?.available)) })
+      .catch(() => { if (active) setLocalAiReady(false) })
+    return () => { active = false }
+  }, [])
 
   useEffect(() => {
     if (showGuidedStart) return
@@ -807,6 +1046,7 @@ export function ReputationDemoPage({ prefill = false, onOpenLibrary }: { prefill
   }, [builderStage, showGuidedStart])
 
   const cancelGeneration = () => {
+    generationRequest.current += 1
     generationTimers.current.forEach(window.clearTimeout)
     generationTimers.current = []
     setGeneratingSlot(null)
@@ -978,23 +1218,50 @@ export function ReputationDemoPage({ prefill = false, onOpenLibrary }: { prefill
     }
   }
 
-  const generateSketch = (id: SlotId, alternativeIndex = 0) => {
+  const generateSketch = async (id: SlotId, alternativeIndex = 0) => {
     const prompt = config.ideaPrompt.trim()
     if (!prompt) return
-    const result = buildCardDraft(prompt, alternativeIndex)
-    if ('error' in result) {
-      setNotice(result.error)
-      return
-    }
     cancelGeneration()
+    const requestId = generationRequest.current + 1
+    generationRequest.current = requestId
     setIdeaFeedbackOpen(false)
     setGeneratingSlot(id)
     setGeneratingAlternative(alternativeIndex > 0)
     setGenerationStep('analyzing')
     setNotice('')
+    let result = buildCardDraft(prompt, alternativeIndex)
+    let usedLocalAi = false
+    if (!isTaskIdea(prompt) && window.location.protocol !== 'file:') {
+      try {
+        const response = await fetch('/api/local-ai/propose', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ idea: prompt, alternativeIndex }),
+        })
+        if (response.ok) {
+          const payload = await response.json() as { proposal?: LocalAiProposal }
+          const localDraft = payload.proposal ? buildLocalAiDraft(prompt, payload.proposal) : null
+          if (localDraft) {
+            result = localDraft
+            usedLocalAi = true
+            setLocalAiReady(true)
+          }
+        }
+      } catch {
+        // Las reglas locales mantienen el flujo disponible si el modelo no responde.
+      }
+    }
+    if (generationRequest.current !== requestId) return
+    if ('error' in result) {
+      setGeneratingSlot(null)
+      setGeneratingAlternative(false)
+      setNotice(result.error)
+      return
+    }
     generationTimers.current = [
-      window.setTimeout(() => setGenerationStep('assembling'), 650),
+      window.setTimeout(() => { if (generationRequest.current === requestId) setGenerationStep('assembling') }, 300),
       window.setTimeout(() => {
+        if (generationRequest.current !== requestId) return
         setConfig((current) => {
           if (current.ideaPrompt.trim() !== prompt) return current
           return result.config
@@ -1005,8 +1272,8 @@ export function ReputationDemoPage({ prefill = false, onOpenLibrary }: { prefill
         generationTimers.current = []
         setSelected('slot-1')
         setIdeaFeedbackOpen(true)
-        setNotice(result.warningCount ? 'Borrador de card listo. Completa los datos señalados antes de compartirlo.' : 'Borrador de card listo. Puedes editar cada parte antes de compartirlo.')
-      }, 1350),
+        setNotice(result.warningCount ? 'Borrador generado. Completa los datos señalados antes de compartirlo.' : usedLocalAi ? 'Propuesta creada con IA local. Puedes editar cada parte antes de compartirla.' : 'Borrador de card listo. Puedes editar cada parte antes de compartirlo.')
+      }, 700),
     ]
   }
 
@@ -1017,7 +1284,7 @@ export function ReputationDemoPage({ prefill = false, onOpenLibrary }: { prefill
 
   const tryAnotherIdea = () => {
     const nextAlternative = ideaAlternativeIndex.current + 1
-    generateSketch('slot-1', nextAlternative)
+    void generateSketch('slot-1', nextAlternative)
   }
 
   const resetDemo = () => {
@@ -1038,6 +1305,10 @@ export function ReputationDemoPage({ prefill = false, onOpenLibrary }: { prefill
   }
 
   const exportContext = () => {
+    if (!getMobileChecks(config, getCardReadiness(config)).every((check) => check.complete)) {
+      setNotice('Completa las validaciones pendientes antes de descargar la revisión.')
+      return
+    }
     const exported = downloadContextHtml({ context: contextExportRef.current, title: config.title, styles: `${contextStyles}\n${demoStyles}` })
     setNotice(exported ? 'Se descargó un HTML con el Template desktop y su adaptación mobile.' : 'No se pudo preparar el HTML. Intenta de nuevo.')
   }
@@ -1045,9 +1316,17 @@ export function ReputationDemoPage({ prefill = false, onOpenLibrary }: { prefill
   const selectedSlot = selected && selected !== 'title' && selected !== 'footer' && config.order.includes(selected) ? selected : null
   const hasIdeaDraft = Boolean(config.ideaPrompt.trim() && config.slots['slot-1'].promptApplied)
   const hasPreviewContent = config.order.some((id) => config.slots[id].enabled)
-  const cardReady = hasPreviewContent && Boolean(config.title.trim()) && Boolean(config.footer.trim())
+  const readiness = getCardReadiness(config)
+  const mobileChecks = getMobileChecks(config, readiness)
+  const mobileReady = mobileChecks.every((check) => check.complete)
+  const templateChecks = [
+    { label: 'Contenido principal configurado', complete: hasPreviewContent },
+    { label: 'Título y acción definidos', complete: readiness.canReview },
+    { label: 'Datos obligatorios completos', complete: readiness.canShare },
+    { label: 'Card ubicada en el Template desktop', complete: true },
+  ]
   const moveToTemplate = () => {
-    if (!cardReady) return
+    if (!readiness.canReview) return
     setBuilderStage('template')
     setTemplateVisited(true)
     setNotice('Revisa ahora cómo se integra la card en el Template desktop.')
@@ -1071,29 +1350,29 @@ export function ReputationDemoPage({ prefill = false, onOpenLibrary }: { prefill
         <div className="reputation-demo__actions">
           <button type="button" className="reputation-demo__reset" onClick={resetDemo}><RotateCcw size={14} aria-hidden="true" /> Reiniciar demo</button>
           <span className="reputation-demo__session-status" aria-live="polite">{sessionStatus}</span>
-          {builderStage === 'build' && <button type="button" className="button button--primary" onClick={moveToTemplate} disabled={!cardReady || generatingSlot !== null}>Ver card en Template</button>}
+          {builderStage === 'build' && <button type="button" className="button button--primary" onClick={moveToTemplate} disabled={!readiness.canReview || generatingSlot !== null}>{readiness.phase === 'review' ? 'Ver borrador en Template' : 'Ver card en Template'}</button>}
           {builderStage === 'template' && <button type="button" className="button button--primary" onClick={moveToMobile}>Revisar adaptación mobile</button>}
-          {builderStage === 'mobile' && <button type="button" className="button button--primary" onClick={exportContext}>Descargar revisión</button>}
+          {builderStage === 'mobile' && <button type="button" className="button button--primary" onClick={exportContext} disabled={!mobileReady}>Descargar revisión</button>}
         </div>
       </header>
 
       <nav className="builder-flow" aria-label="Etapas de creación de la card">
-        <button type="button" className={builderStage === 'build' ? 'is-current' : ''} aria-current={builderStage === 'build' ? 'step' : undefined} onClick={() => setBuilderStage('build')}><span>1</span><strong>Crear card</strong><small>{cardReady ? 'Lista para contexto' : 'Contenido, título y acción'}</small></button>
-        <button type="button" className={builderStage === 'template' ? 'is-current' : ''} aria-current={builderStage === 'template' ? 'step' : undefined} onClick={moveToTemplate} disabled={!cardReady}><span>2</span><strong>Ver en Template</strong><small>Revisión desktop</small></button>
+        <button type="button" className={builderStage === 'build' ? 'is-current' : ''} aria-current={builderStage === 'build' ? 'step' : undefined} onClick={() => setBuilderStage('build')}><span>1</span><strong>Crear card</strong><small>{readiness.label}</small></button>
+        <button type="button" className={builderStage === 'template' ? 'is-current' : ''} aria-current={builderStage === 'template' ? 'step' : undefined} onClick={moveToTemplate} disabled={!readiness.canReview}><span>2</span><strong>Ver en Template</strong><small>Revisión desktop</small></button>
         <button type="button" className={builderStage === 'mobile' ? 'is-current' : ''} aria-current={builderStage === 'mobile' ? 'step' : undefined} onClick={moveToMobile} disabled={!templateVisited}><span>3</span><strong>Adaptar a mobile</strong><small>Revisión y descarga</small></button>
       </nav>
 
       {builderStage === 'build' ? <>
       <div className="reputation-demo__layout">
         <aside className="reputation-demo__panel reputation-demo__palette" aria-labelledby="reputation-demo-slots-title">
-          <div className="reputation-demo__panel-heading"><p className="eyebrow">1. Construye la card</p><h2 id="reputation-demo-slots-title">Slots · {config.order.length}/3</h2><p>{config.order.length === 0 ? 'Agrega el primer slot para definir la estructura de la card.' : 'Agrega o selecciona un slot para completar su contenido.'}</p></div>
+          <div className="reputation-demo__panel-heading"><p className="eyebrow">1. Construye la card</p><h2 id="reputation-demo-slots-title">Slots configurados · {config.order.filter((id) => config.slots[id].enabled).length} de {config.order.length || 3}</h2><p>{config.order.length === 0 ? 'Agrega el primer slot para definir la estructura de la card.' : 'Los slots disponibles no cuentan como contenido hasta que los completes.'}</p></div>
           <ol className="reputation-demo__slot-list">
             {config.order.map((id) => {
               const slot = config.slots[id]
               const slotNumber = allSlotIds.indexOf(id) + 1
               return <li key={id} className={`reputation-demo__palette-slot${slot.enabled ? ' is-added' : ''}`} draggable onDragStart={(event) => { event.dataTransfer.setData('application/x-summary-slot', id); event.dataTransfer.effectAllowed = 'copy' }}>
                 <GripVertical size={15} aria-hidden="true" />
-                <span><strong>Slot {slotNumber} · {slotRoles[id].name}</strong><small className="reputation-demo__slot-purpose">{slotRoles[id].description}</small><small>Patrón: {slotContentName(slot)}{slot.source === 'library' && slot.variant === 'value' ? ` · ${slot.columns} ${slot.columns === 1 ? 'columna' : 'columnas'}` : ''}</small></span>
+                <span><strong>Slot {slotNumber} · {slotRoles[id].name}</strong><small className="reputation-demo__slot-purpose">{slotRoles[id].description}</small><small>Patrón: {slotContentName(slot)}{(slot.source === 'library' || slot.usesLibraryVariant) && slot.variant === 'value' ? ` · ${slot.columns} ${slot.columns === 1 ? 'columna' : 'columnas'}` : ''}</small></span>
                 <button type="button" onClick={() => fillSlot(id)} aria-label={`${slot.enabled ? 'Editar' : 'Agregar'} Slot ${slotNumber}: ${slotRoles[id].name}`}>{slot.enabled ? 'Editar' : 'Agregar'}</button>
               </li>
             })}
@@ -1117,7 +1396,7 @@ export function ReputationDemoPage({ prefill = false, onOpenLibrary }: { prefill
                     {slot.enabled ? slot.source === 'figma' && slot.figmaImageDataUrl ? <div className={`reputation-demo__filled-slot reputation-demo__filled-slot--figma${selected === id ? ' is-selected' : ''}`} data-preview-source={slot.figmaImageSource}>
                       <div className="reputation-demo__figma-render"><img src={slot.figmaImageDataUrl} alt={`Diseño de Figma en Slot ${slotNumber}`} /></div>
                       <button type="button" className="reputation-demo__edit-figma" onClick={() => setSelected(id)} aria-label={`Editar Slot ${slotNumber}: diseño de Figma`}>Editar slot</button>
-                    </div> : <button type="button" className={`reputation-demo__filled-slot reputation-demo__filled-slot--${slot.source === 'library' ? slot.variant : slot.source}${selected === id ? ' is-selected' : ''}`} data-tone={slot.tone} onClick={() => setSelected(id)} aria-label={`Editar Slot ${slotNumber}, ${slotRoles[id].name}: ${slotContentName(slot)}`}>
+                    </div> : <button type="button" className={`reputation-demo__filled-slot reputation-demo__filled-slot--${slot.source === 'library' || slot.usesLibraryVariant ? slot.variant : slot.source}${selected === id ? ' is-selected' : ''}`} data-tone={slot.tone} onClick={() => setSelected(id)} aria-label={`Editar Slot ${slotNumber}, ${slotRoles[id].name}: ${slotContentName(slot)}`}>
                       <SlotPreviewContent slot={slot} isGenerating={generatingSlot === id} generationStep={generationStep} />
                     </button> : <button type="button" className="reputation-demo__empty-slot" onClick={() => fillSlot(id)} aria-label={`${slotRoles[id].emptyAction} en Slot ${slotNumber}`}><span aria-hidden="true">⇄</span><span>{slotRoles[id].emptyAction}</span></button>}
                     {slot.enabled && slot.source === 'figma' && validFigmaUrl(slot.figmaUrl) && slot.figmaImageDataUrl && <a className="reputation-demo__figma-open" href={slot.figmaUrl} target="_blank" rel="noreferrer">Abrir en Figma ↗</a>}
@@ -1173,9 +1452,10 @@ export function ReputationDemoPage({ prefill = false, onOpenLibrary }: { prefill
               {figmaNeedsConnection && window.location.protocol !== 'file:' && <a className="reputation-demo__figma-link" href="/api/figma/connect?returnTo=/">Conectar Figma</a>}
               <p id="reputation-demo-figma-help">{window.location.protocol === 'file:' ? 'Este HTML no descarga imágenes privadas de Figma desde el enlace. Para esta demo, usa la imagen exportada arriba.' : 'Con Figma conectado puedes agregar el diseño desde el enlace; también puedes subir una imagen para la demo.'}</p>
             </div> : <div className="reputation-demo__free-fields">
-              <div className="reputation-demo__idea-intro"><h3>Convierte tu idea en una card</h3><p>Cuenta qué quieres lograr y el Builder preparará una propuesta editable con los patrones disponibles de Summary.</p></div>
+              <div className="reputation-demo__idea-intro"><h3>Convierte tu idea en una card</h3><p>Cuenta qué quieres lograr y el Builder preparará una propuesta editable con los patrones disponibles de Summary.</p><p className="reputation-demo__local-note">{localAiReady ? 'IA local activa: explora composiciones sin enviar tu idea fuera de este equipo.' : 'Motor de reglas local: usa las composiciones base de Summary.'}</p>{config.slots[selectedSlot].usesLibraryVariant && <p className="reputation-demo__local-note">Componente sugerido: <strong>{variantName(config.slots[selectedSlot].variant)}</strong> de la Librería. Sigues en Mi idea para ajustar o crear otra alternativa.</p>}</div>
               <label>Tu idea para la card<textarea ref={ideaPromptRef} rows={6} maxLength={700} placeholder={'Describe:\n• qué necesitas mostrar o resolver\n• los datos, período o comparación clave\n• la acción que debería seguir la persona'} value={config.ideaPrompt} onChange={(event) => { cancelGeneration(); ideaAlternativeIndex.current = 0; setIdeaFeedbackOpen(false); setConfig((current) => ({ ...current, ideaPrompt: event.target.value })) }} /></label>
-              <button type="button" className="reputation-demo__apply-idea" disabled={!config.ideaPrompt.trim() || generatingSlot !== null} onClick={() => generateSketch(selectedSlot, hasIdeaDraft ? ideaAlternativeIndex.current + 1 : 0)}>{generatingSlot !== null ? 'Preparando propuesta…' : hasIdeaDraft ? 'Crear otra propuesta' : 'Crear mi propuesta'}</button>
+              <p className="reputation-demo__local-note">{localAiReady ? 'La propuesta se procesa con el modelo instalado en este equipo; no se envía a un proveedor externo.' : 'La propuesta se interpreta con reglas locales de Summary.'}</p>
+              <button type="button" className="reputation-demo__apply-idea" disabled={!config.ideaPrompt.trim() || generatingSlot !== null} onClick={() => void generateSketch(selectedSlot, hasIdeaDraft ? ideaAlternativeIndex.current + 1 : 0)}>{generatingSlot !== null ? 'Preparando propuesta…' : hasIdeaDraft ? 'Crear otra propuesta' : 'Crear mi propuesta'}</button>
               {draftWarnings(config).length > 0 && <div className="reputation-demo__draft-warnings" role="status"><strong>Antes de compartir, completa:</strong><ul>{draftWarnings(config).map((warning) => <li key={warning}>{warning}</li>)}</ul></div>}
             </div>}
             {config.slots[selectedSlot].source === 'prompt' && config.slots[selectedSlot].sketch && <div className="reputation-demo__free-fields reputation-demo__sketch-edit">
@@ -1190,8 +1470,12 @@ export function ReputationDemoPage({ prefill = false, onOpenLibrary }: { prefill
           </div> : selected === 'title' ? <div className="reputation-demo__fields"><label>Título<input value={config.title} placeholder="Title" onChange={(event) => setConfig((current) => ({ ...current, title: event.target.value, autoTitle: false }))} /></label></div> : selected === 'footer' ? <div className="reputation-demo__fields"><label>Texto del CTA<input value={config.footer} onChange={(event) => setConfig((current) => ({ ...current, footer: event.target.value, autoFooter: false }))} /></label></div> : <div className="reputation-demo__inspector-empty"><strong>Primero agrega un slot desde Construcción de la card.</strong><p>Al seleccionarlo, aquí eliges si completarlo desde Librería, Figma o Mi idea.</p></div>}
         </aside>
       </div>
+      <aside className={`reputation-demo__readiness reputation-demo__readiness--${readiness.phase}`} aria-live="polite">
+        <strong>{readiness.label}</strong><span>{readiness.detail}</span>
+        {readiness.issues.length > 0 && <ul>{readiness.issues.map((issue) => <li key={issue}>{issue}</li>)}</ul>}
+      </aside>
       {generatingSlot && <aside className="reputation-demo__idea-agent reputation-demo__idea-agent--working" role="status" aria-live="polite"><Sparkles size={20} aria-hidden="true" /><strong>{generatingAlternative ? generationStep === 'analyzing' ? 'Pensando otra idea…' : 'Cargando la nueva propuesta…' : generationStep === 'analyzing' ? 'Entendiendo tu idea…' : 'Armando tu propuesta…'}</strong></aside>}
-      {ideaFeedbackOpen && !generatingSlot && <aside className="reputation-demo__idea-agent" aria-live="polite"><Sparkles size={20} aria-hidden="true" /><div className="reputation-demo__idea-agent-copy"><strong>Propuesta lista</strong><span>¿Te gusta esta propuesta?</span></div><div className="reputation-demo__idea-agent-actions"><button type="button" onClick={keepIdeaProposal}>Me gusta</button><button type="button" onClick={tryAnotherIdea}>Probar otra idea</button></div><button type="button" className="reputation-demo__idea-agent-close" onClick={() => setIdeaFeedbackOpen(false)} aria-label="Cerrar opciones de la propuesta"><X size={16} aria-hidden="true" /></button></aside>}
+      {ideaFeedbackOpen && !generatingSlot && <aside className="reputation-demo__idea-agent" aria-live="polite"><Sparkles size={20} aria-hidden="true" /><div className="reputation-demo__idea-agent-copy"><strong>{readiness.phase === 'ready' ? 'Propuesta lista para compartir' : 'Borrador generado'}</strong><span>{readiness.phase === 'ready' ? 'Puedes revisarla en contexto o descargarla.' : readiness.detail}</span></div><div className="reputation-demo__idea-agent-actions"><button type="button" onClick={keepIdeaProposal}>{readiness.phase === 'ready' ? 'Conservar propuesta' : 'Completar borrador'}</button><button type="button" onClick={tryAnotherIdea}>Probar otra idea</button></div><button type="button" className="reputation-demo__idea-agent-close" onClick={() => setIdeaFeedbackOpen(false)} aria-label="Cerrar opciones de la propuesta"><X size={16} aria-hidden="true" /></button></aside>}
       </> : builderStage === 'template' ? <section className="builder-review" aria-labelledby="template-review-title">
         <header className="builder-review__intro">
           <p className="eyebrow">2. Ver en Template</p>
@@ -1201,18 +1485,12 @@ export function ReputationDemoPage({ prefill = false, onOpenLibrary }: { prefill
         <div className="builder-review__layout builder-review__layout--template">
           <TemplateContextPreview config={config} />
           <aside className="builder-review__panel">
-            <h3>Ubica la card nueva</h3>
-            <div className="builder-review__placement">
-              <label>Columna<select value={config.placement.column} onChange={(event) => setConfig((current) => ({ ...current, placement: { column: Number(event.target.value), after: null } }))}>{templateColumns.map((_, index) => <option key={index} value={index}>Columna {index + 1}</option>)}</select></label>
-              <label>Posición<select value={config.placement.after ?? ''} onChange={(event) => setConfig((current) => ({ ...current, placement: { ...current.placement, after: event.target.value || null } }))}><option value="">Al inicio de la columna</option>{templateColumns[config.placement.column].map((card) => <option key={card.id} value={card.id}>Después de {card.label}</option>)}</select></label>
-            </div>
+            <h3>Ubicación sugerida</h3>
+            <div className="builder-review__recommendation"><strong>Columna 3 · después de Reputación</strong><p>Es una referencia para una card de métricas. Conserva la lectura visual y no confirma elegibilidad ni comportamiento productivo.</p><button type="button" className="builder-review__use-placement" onClick={() => setConfig((current) => ({ ...current, placement: { column: 2, after: 'reputation' } }))}>Usar ubicación sugerida</button></div>
+            <details className="builder-review__placement-details"><summary>Ajustar posición manualmente</summary><div className="builder-review__placement"><label>Columna<select value={config.placement.column} onChange={(event) => setConfig((current) => ({ ...current, placement: { column: Number(event.target.value), after: null } }))}>{templateColumns.map((_, index) => <option key={index} value={index}>Columna {index + 1}</option>)}</select></label><label>Posición<select value={config.placement.after ?? ''} onChange={(event) => setConfig((current) => ({ ...current, placement: { ...current.placement, after: event.target.value || null } }))}><option value="">Al inicio de la columna</option>{templateColumns[config.placement.column].map((card) => <option key={card.id} value={card.id}>Después de {card.label}</option>)}</select></label></div></details>
             <p>La card aparece marcada en azul dentro de la grilla completa del template de Figma.</p>
             <h3>Checklist de contexto</h3>
-            <ul>
-              <li><span aria-hidden="true">✓</span>Contenido principal configurado</li>
-              <li><span aria-hidden="true">✓</span>Título y acción definidos</li>
-              <li><span aria-hidden="true">✓</span>Card ubicada en el Template desktop</li>
-            </ul>
+            <ul className="builder-review__checklist">{templateChecks.map((check) => <li className={check.complete ? 'is-complete' : 'is-pending'} key={check.label}><span aria-hidden="true">{check.complete ? '✓' : '!'}</span>{check.label}</li>)}</ul>
             <p>La ubicación elegida se conserva en la revisión y en el HTML descargable. Los datos de las demás cards son ejemplos de referencia.</p>
             <button type="button" className="builder-review__back" onClick={() => setBuilderStage('build')}>Volver a editar la card</button>
             <button type="button" className="button button--primary" onClick={moveToMobile}>Revisar adaptación mobile</button>
@@ -1221,21 +1499,17 @@ export function ReputationDemoPage({ prefill = false, onOpenLibrary }: { prefill
       </section> : <section className="builder-review" aria-labelledby="mobile-review-title">
         <header className="builder-review__intro">
           <p className="eyebrow">3. Adaptar a mobile</p>
-          <h2 id="mobile-review-title" ref={stageHeadingRef} tabIndex={-1}>Revisa la misma card en mobile</h2>
-          <p>La adaptación parte de una sola configuración: revisa que el contenido conserve su jerarquía y se lea con claridad.</p>
+          <h2 id="mobile-review-title" ref={stageHeadingRef} tabIndex={-1}>Valida la card en mobile</h2>
+          <p>La adaptación parte de una sola configuración. Antes de compartir, revisa los límites que cambian la legibilidad en una columna.</p>
         </header>
         <div className="builder-review__layout builder-review__layout--mobile">
           <MobileContextPreview config={config} />
           <aside className="builder-review__panel">
-            <h3>Adaptación aplicada</h3>
-            <ul>
-              <li><span aria-hidden="true">✓</span>La card conserva el mismo contenido</li>
-              <li><span aria-hidden="true">✓</span>El Template pasa a una columna</li>
-              <li><span aria-hidden="true">✓</span>El CTA sigue visible al final de la card</li>
-            </ul>
-            <p>Esta revisión reúne la vista desktop y mobile para compartir una propuesta con contexto.</p>
+            <h3>Validación mobile</h3>
+            <ul className="builder-review__checklist">{mobileChecks.map((check) => <li className={check.complete ? 'is-complete' : 'is-pending'} key={check.label}><span aria-hidden="true">{check.complete ? '✓' : '!'}</span>{check.label}</li>)}</ul>
+            <p>{mobileReady ? 'La propuesta puede compartirse con las vistas desktop y mobile.' : 'Vuelve a editar la card y resuelve los puntos pendientes antes de descargar.'}</p>
             <button type="button" className="builder-review__back" onClick={() => setBuilderStage('template')}>Volver al Template desktop</button>
-            <button type="button" className="button button--primary" onClick={exportContext}>Descargar revisión desktop y mobile</button>
+            <button type="button" className="button button--primary" onClick={exportContext} disabled={!mobileReady}>Descargar revisión desktop y mobile</button>
           </aside>
         </div>
         <div className="builder-final-review" ref={contextExportRef}>

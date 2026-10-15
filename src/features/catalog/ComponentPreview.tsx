@@ -23,6 +23,7 @@ import { BusinessMetricsCard } from '../component-detail/BusinessMetricsCard'
 import { MoneyCard } from '../component-detail/MoneyCard'
 import { BillingCard } from '../component-detail/BillingCard'
 import { CreditScoringCard } from '../component-detail/CreditScoringCard'
+import { PriceCompetitivenessCard } from '../component-detail/PriceCompetitivenessCard'
 import { AdvertisingMetricsCard, ControlPanelCard, FullSpacesCard, MyPageCard, ShippingPerformanceCard, type AdvertisingMetric, type FullSpaceMetric, type ShippingMetric } from '../component-detail/RemainingCards'
 
 type PreviewKind = 'tasks-publication' | 'tasks-sales' | 'reputation' | 'news' | 'metric' | 'money' | 'billing' | 'shipping' | 'inventory' | 'prices' | 'store' | 'ads' | 'score' | 'dashboard'
@@ -107,6 +108,11 @@ function RealCreditScoringPreview() {
   return <div className="catalog-real-component catalog-real-component--credits-scoring"><CreditScoringCard title="Empréstimos para seu negócio" score="399" description="Um bom score é o que pode te ajudar a ter crédito." infoLink="Text link" recommendation="Conecte dados de outros bancos e melhore seu score." recommendationAction="Conectar bancos" footer="Ir para Empréstimos" onInfoLink={noAction} onRecommendationAction={noAction} onHideRecommendation={noAction} onNavigate={noAction} /></div>
 }
 
+function RealPriceCompetitivenessPreview() {
+  const noAction = () => undefined
+  return <div className="catalog-real-component catalog-real-component--price-competitiveness"><PriceCompetitivenessCard benefits={['Tarifa de venta reducida en categorías seleccionadas.', 'Acceso a campañas con inversión de Mercado Libre.']} products={[{ id: 'iphone-17', name: 'Apple iPhone 17 Pro Max (256 GB) - Naranja cósmico' }, { id: 'iphone-16', name: 'Apple iPhone 16 (128 GB) - Negro' }, { id: 'iphone-11', name: 'Apple iPhone 11 (64 GB) - Blanco' }]} onNavigate={noAction} onOpenProducts={noAction} /></div>
+}
+
 const collectMetrics: ShippingMetric[] = [{ id: 'current', value: '97%', label: 'Semana actual', tone: 'positive' }, { id: 'recent', value: '97%', label: 'Últimas 4 semanas', tone: 'positive' }]
 const flexMetrics: ShippingMetric[] = [{ id: 'current', value: '94%', label: 'Semana actual', tone: 'caution' }]
 const fullMetrics: FullSpaceMetric[] = [{ id: 'small', percentage: '150%', label: 'Pequeños y medianos', units: '1980 u. de 2000 u.', tone: 'negative' }, { id: 'large', percentage: '150%', label: 'Grandes y extragrandes', units: '1980 u. de 2000 u.', tone: 'negative' }]
@@ -170,6 +176,7 @@ export function ComponentPreview({ componentId }: { componentId: string }) {
   if (componentId === 'money') return <div className="component-preview component-preview--real" aria-hidden="true"><RealMoneyPreview /></div>
   if (componentId === 'billing') return <div className="component-preview component-preview--real" aria-hidden="true"><RealBillingPreview /></div>
   if (componentId === 'credits-scoring') return <div className="component-preview component-preview--real" aria-hidden="true"><RealCreditScoringPreview /></div>
+  if (componentId === 'price-competitiveness') return <div className="component-preview component-preview--real" aria-hidden="true"><RealPriceCompetitivenessPreview /></div>
   if (['shipping-collect', 'shipping-flex', 'full', 'my-page', 'advertising-metrics', 'control-panel'].includes(componentId)) return <div className="component-preview component-preview--real" aria-hidden="true"><RealRemainingPreview componentId={componentId} /></div>
 
   return (

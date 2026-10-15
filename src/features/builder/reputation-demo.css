@@ -394,6 +394,16 @@
 .reputation-demo__draft-warnings { padding: 10px 11px; border: 1px solid #b6813a; border-radius: 6px; color: #f7dcae; background: #392b19; font-size: 11px; line-height: 1.45; }
 .reputation-demo__draft-warnings strong { display: block; margin-bottom: 4px; }
 .reputation-demo__draft-warnings ul { margin: 0; padding-left: 16px; }
+.reputation-demo__readiness { display: grid; gap: 4px; margin-top: 14px; padding: 12px 14px; border: 1px solid var(--sa-color-border-subtle); color: var(--sa-color-text-secondary); background: var(--sa-color-surface); border-radius: var(--sa-radius-panel); font-size: 11px; line-height: 1.45; }
+.reputation-demo__readiness strong { color: var(--sa-color-text); font-size: 12px; }
+.reputation-demo__readiness > span { color: var(--sa-color-text-muted); }
+.reputation-demo__readiness ul { display: grid; gap: 3px; margin: 3px 0 0; padding-left: 16px; }
+.reputation-demo__readiness--review { border-color: #b6813a; background: #392b19; }
+.reputation-demo__readiness--review strong { color: #f7dcae; }
+.reputation-demo__readiness--review > span, .reputation-demo__readiness--review li { color: #f0d8ad; }
+.reputation-demo__readiness--ready { border-color: #3c9b69; background: #173b2b; }
+.reputation-demo__readiness--ready strong { color: #bcefd0; }
+.reputation-demo__readiness--ready > span { color: #d2eadb; }
 .reputation-demo__draft-item { display: grid; gap: 8px; padding: 9px; border: 1px solid var(--sa-color-border); border-radius: 6px; }
 .reputation-demo__field-error { padding: 9px 11px; border: 1px solid #8c4540; border-radius: 6px; color: #ffd0c9 !important; background: #3b2328; font-size: 11px !important; }
 .reputation-demo__figma-link { color: #3483fa; font-size: 11px; font-weight: 600; text-decoration: none; }
@@ -415,6 +425,7 @@
 .reputation-demo__idea-agent-close { width: 28px; height: 28px; flex: 0 0 28px; display: grid; place-items: center; padding: 0; border: 0; color: #fff; background: rgba(0,0,0,.13); border-radius: 50%; }
 .reputation-demo__apply-idea { min-height: 36px; border: 0; color: #fff; background: #3483fa; border-radius: var(--sa-radius-control); font-size: 11px; font-weight: 700; }
 .reputation-demo__apply-idea:disabled { cursor: not-allowed; opacity: .5; }
+.reputation-demo__local-note { margin: -2px 0 2px; color: var(--sa-color-text-secondary); font-size: 10px; line-height: 1.35; }
 .reputation-demo__card button:focus-visible, .reputation-demo__card-header input:focus-visible { outline: 2px solid #3483fa; outline-offset: -2px; }
 .reputation-demo__metric-fields { min-width: 0; display: grid; gap: 10px; grid-column: 1 / -1; margin: 0; padding: 0; border: 0; }
 .reputation-demo__metric-fields legend { margin-bottom: 4px; color: var(--sa-color-text-secondary); font-size: 11px; font-weight: 700; }
@@ -447,6 +458,7 @@
 .builder-review__panel li > span { width: 17px; height: 17px; flex: 0 0 17px; display: grid; place-items: center; color: #fff; background: #00a650; border-radius: 50%; font-size: 11px; font-weight: 700; }
 .builder-review__panel > p { margin: 0; color: var(--sa-color-text-muted); font-size: 12px; line-height: 1.5; }
 .builder-review__panel .button, .builder-review__back { min-height: 44px; width: 100%; padding: 0 12px; border-radius: var(--sa-radius-control); font-size: 12px; font-weight: 700; }
+.builder-review__panel .button:disabled { cursor: not-allowed; opacity: .5; }
 .builder-review__back { border: 1px solid var(--sa-color-border); color: var(--sa-color-text-secondary); background: transparent; }
 .builder-review__back:hover { color: var(--sa-color-text); background: var(--sa-color-surface-hover); }
 .template-context { overflow: hidden; border: 1px solid #dce1e8; color: #202124; background: #f4f5f6; border-radius: 12px; box-shadow: 0 7px 22px rgb(0 0 0 / 14%); }
@@ -471,6 +483,15 @@
 .builder-review__placement { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .builder-review__placement label { display: grid; gap: 6px; color: var(--sa-color-text-secondary); font-size: 12px; font-weight: 600; }
 .builder-review__placement select { width: 100%; min-height: 38px; padding: 0 10px; border: 1px solid var(--sa-color-border); color: var(--sa-color-text); background: var(--sa-color-surface); border-radius: 7px; font: inherit; }
+.builder-review__recommendation { display: grid; gap: 7px; padding: 12px; border: 1px solid var(--sa-color-selected-border); background: var(--sa-color-selected-surface); border-radius: 8px; }
+.builder-review__recommendation strong { color: var(--sa-color-text); font-size: 12px; }
+.builder-review__recommendation p { margin: 0; color: var(--sa-color-text-muted); font-size: 11px; line-height: 1.45; }
+.builder-review__use-placement { justify-self: start; min-height: 34px; padding: 0 10px; border: 1px solid var(--sa-color-selected-border); color: var(--sa-color-action); background: var(--sa-color-surface); border-radius: 6px; font-size: 11px; font-weight: 700; }
+.builder-review__placement-details { display: grid; gap: 10px; color: var(--sa-color-text-secondary); font-size: 12px; }
+.builder-review__placement-details summary { cursor: pointer; font-weight: 700; }
+.builder-review__placement-details[open] summary { margin-bottom: 2px; }
+.builder-review__checklist li.is-pending { color: #f0d8ad; }
+.builder-review__checklist li.is-pending > span { color: #392b19; background: #f1bc61; }
 .template-context { color: #191919; background: #ededed; font-family: "Proxima Nova", sans-serif; }
 .template-context__viewport { max-width: 100%; overflow-x: auto; }
 .template-context__page { min-width: 1280px; padding-bottom: 50px; background: #ededed; }

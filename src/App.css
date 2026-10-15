@@ -8,6 +8,10 @@ html, body, #root, body * { font-family: var(--font-family-base); }
 body { margin: 0; min-width: 320px; min-height: 100vh; background: #0b1020; }
 button, input, select, textarea { font: inherit; font-family: inherit; }
 button { cursor: pointer; }
+.pwa-install, .pwa-status { position: fixed; right: 20px; bottom: 20px; z-index: 20; min-height: 42px; padding: 0 16px; border: 0; border-radius: 999px; color: #1f2226; background: #ffe600; box-shadow: 0 8px 24px rgba(0, 0, 0, .28); font-size: 13px; font-weight: 700; }
+.pwa-install:hover { background: #fff159; }
+.pwa-install:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+.pwa-status { display: grid; place-items: center; margin: 0; color: #e8fff2; background: #246e4b; }
 .app-shell { min-height: 100vh; display: grid; grid-template-columns: 224px 1fr; }
 .sidebar { position: sticky; top: 0; height: 100vh; padding: 20px 14px; color: #f7f7f7; background: #1f2226; display: flex; flex-direction: column; }
 .brand { display: flex; align-items: center; gap: 9px; margin: 0 6px 28px; font-size: 13px; font-weight: 700; }
@@ -897,6 +901,54 @@ h3 { font-size: 15px; }
 
 /* Card de score y créditos basada en la variante M1 de Figma */
 .catalog-real-component--credits-scoring { transform: scale(.38); }
+.catalog-real-component--price-competitiveness { transform: scale(.35); }
+.price-competitiveness-card { width: 269px; overflow: hidden; color: rgba(0,0,0,.9); background: #fff; border-radius: 6px; box-shadow: 0 1px 2px rgba(0,0,0,.12); font-family: var(--font-family-base); }
+.price-competitiveness-card__header { min-height: 52px; position: relative; display: flex; align-items: center; padding: 16px; border-bottom: 1px solid rgba(0,0,0,.1); }
+.price-competitiveness-card__header h3 { overflow: hidden; margin: 0; color: rgba(0,0,0,.9); font-size: 14px; font-weight: 600; line-height: 18px; text-overflow: ellipsis; white-space: nowrap; }
+.price-competitiveness-card__header > span { position: absolute; top: 0; right: 0; padding: 1px 6px; color: #fff; background: #3483fa; border-radius: 0 6px 0 6px; font-size: 12px; font-weight: 600; line-height: 14px; text-transform: uppercase; }
+.price-competitiveness-card__content { min-height: 380px; display: flex; flex-direction: column; gap: 24px; padding: 16px; }
+.price-competitiveness-card__summary { min-height: 40px; display: flex; align-items: end; gap: 16px; }
+.price-competitiveness-card__gauge { width: 80px; height: 40px; flex: 0 0 auto; position: relative; }
+.price-competitiveness-card__gauge > img { position: absolute; inset: 0; display: block; width: 80px; height: 40px; }
+.price-competitiveness-card__gauge-progress { width: 20px !important; height: 34px !important; top: 6px !important; }
+.price-competitiveness-card__gauge strong { position: absolute; bottom: -5px; left: 0; width: 100%; color: #f23d4f; font-size: 14px; font-weight: 600; line-height: 18px; text-align: center; }
+.price-competitiveness-card__metric { min-width: 0; display: flex; flex-direction: column; gap: 2px; padding-bottom: 0; }
+.price-competitiveness-card__metric > div { display: flex; align-items: center; gap: 4px; }
+.price-competitiveness-card__metric strong { color: rgba(0,0,0,.9); font-size: 16px; font-weight: 600; line-height: 20px; white-space: nowrap; }
+.price-competitiveness-card__metric svg, .price-competitiveness-card__benefits svg { flex: 0 0 auto; color: #f23d4f; fill: #f23d4f; stroke: #fff; stroke-width: 2.5; }
+.price-competitiveness-card__metric > span { max-width: 116px; font-size: 12px; line-height: 15px; }
+.price-competitiveness-card__benefits { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid #e5e5e5; border-radius: 6px; }
+.price-competitiveness-card__benefits > strong, .price-competitiveness-card__products > strong { color: rgba(0,0,0,.9); font-size: 12px; font-weight: 600; line-height: 15px; }
+.price-competitiveness-card__benefits ul { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.price-competitiveness-card__benefits li { display: flex; align-items: flex-start; gap: 4px; font-size: 12px; line-height: 15px; }
+.price-competitiveness-card__benefits li svg { margin-top: 1px; }
+.price-competitiveness-card__products { display: flex; flex-direction: column; gap: 8px; }
+.price-competitiveness-card__products > button { display: flex; flex-direction: column; padding: 0; border: 0; color: inherit; background: transparent; text-align: left; }
+.price-competitiveness-card__product { min-width: 0; display: flex; align-items: center; gap: 8px; padding: 4px 8px 4px 4px; border-radius: 6px; }
+.price-competitiveness-card__product:hover { background: #f5f5f5; }
+.price-competitiveness-card__product > img, .price-competitiveness-card__product > i { width: 24px; height: 24px; flex: 0 0 auto; display: grid; place-items: center; overflow: hidden; border-radius: 50%; font-size: 11px; font-style: normal; font-weight: 600; }
+.price-competitiveness-card__product > img { object-fit: cover; }
+.price-competitiveness-card__product > i { color: #4d5968; background: #e9edf2; }
+.price-competitiveness-card__product > span { overflow: hidden; font-size: 12px; line-height: 15px; text-overflow: ellipsis; white-space: nowrap; }
+.price-competitiveness-card__more { padding: 6px 4px 0 36px; color: rgba(0,0,0,.55); font-size: 12px; line-height: 15px; }
+.price-competitiveness-card__footer { min-height: 53px; padding-top: 16px; border-top: 1px solid rgba(0,0,0,.1); }
+.price-competitiveness-card__footer button { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 16px 16px; border: 0; color: #3483fa; background: transparent; font: 600 14px/18px var(--font-family-base); text-align: left; }
+.price-competitiveness-card__footer button:hover { color: #2968c8; }
+.price-competitiveness-card__footer img { width: 20px; height: 20px; flex: 0 0 auto; transform: rotate(90deg); }
+.price-competitiveness-card__state { min-height: 348px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 8px; font-size: 12px; line-height: 15px; }
+.price-competitiveness-card__state strong { font-size: 14px; line-height: 18px; }
+.price-competitiveness-card__state button { padding: 0; border: 0; color: #3483fa; background: transparent; font: 600 12px/15px var(--font-family-base); }
+.price-competitiveness-card__state--loading i { width: 100%; height: 14px; background: #e6e6e6; border-radius: 4px; }
+.price-competitiveness-card__state--loading i:nth-child(2) { width: 65%; height: 28px; }
+.price-competitiveness-card__state--loading i:nth-child(3) { width: 85%; }
+.sa-theme .price-competitiveness-card :is(h3,strong) { color: rgba(0,0,0,.9); }
+.preview-canvas--price-competitiveness { min-height: 720px; }
+.preview-canvas--dark .price-competitiveness-card { color: rgba(255,255,255,.9); background: #353940; }
+.sa-theme .preview-canvas--dark .price-competitiveness-card :is(h3,strong) { color: rgba(255,255,255,.9); }
+.preview-canvas--dark .price-competitiveness-card__header, .preview-canvas--dark .price-competitiveness-card__footer { border-color: rgba(255,255,255,.14); }
+.preview-canvas--dark .price-competitiveness-card__metric > span, .preview-canvas--dark .price-competitiveness-card__more { color: rgba(255,255,255,.62); }
+.preview-canvas--dark .price-competitiveness-card__benefits { border-color: rgba(255,255,255,.18); }
+.preview-canvas--dark .price-competitiveness-card__product:hover { background: rgba(255,255,255,.08); }
 .credit-scoring-card { width: 269px; overflow: hidden; color: rgba(0,0,0,.9); background: #fff; border-radius: 6px; box-shadow: 0 1px 2px rgba(0,0,0,.12); font-family: var(--font-family-base); }
 .credit-scoring-card__header { height: 51px; position: relative; display: flex; align-items: center; padding: 0 16px; border-bottom: 1px solid rgba(0,0,0,.1); }
 .credit-scoring-card__header h3 { overflow: hidden; margin: 0; color: rgba(0,0,0,.9); font-size: 14px; font-weight: 600; line-height: 18px; text-overflow: ellipsis; white-space: nowrap; }

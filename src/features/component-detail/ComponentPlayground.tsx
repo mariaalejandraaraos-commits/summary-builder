@@ -8,6 +8,7 @@ import { MoneyCard } from './MoneyCard'
 import { BillingCard } from './BillingCard'
 import { RemainingPlayground } from './RemainingPlaygrounds'
 import { CreditScoringPlayground } from './CreditScoringPlayground'
+import { PriceCompetitivenessCard, type PriceCompetitivenessProduct, type PriceCompetitivenessState } from './PriceCompetitivenessCard'
 
 type Variant = 'Normal' | 'Loading' | 'No disponible'
 type Viewport = 'Desktop' | 'Mobile / Webview'
@@ -433,6 +434,37 @@ export function ComponentPlayground({ component }: { component: SummaryComponent
   if (component.id === 'money') return <MoneyPlayground />
   if (component.id === 'billing') return <BillingPlayground component={component} />
   if (component.id === 'credits-scoring') return <CreditScoringPlayground />
+  if (component.id === 'price-competitiveness') return <PriceCompetitivenessPlayground component={component} />
   if (['shipping-collect', 'shipping-flex', 'full', 'my-page', 'advertising-metrics', 'control-panel'].includes(component.id)) return <RemainingPlayground component={component} />
   return <GenericPlayground component={component} />
+}
+
+const initialPriceProducts: PriceCompetitivenessProduct[] = [
+  { id: 'iphone-17', name: 'Apple iPhone 17 Pro Max (256 GB) - Naranja cósmico' },
+  { id: 'iphone-16', name: 'Apple iPhone 16 (128 GB) - Negro' },
+  { id: 'iphone-11', name: 'Apple iPhone 11 (64 GB) - Blanco' },
+  { id: 'samsung-s25', name: 'Samsung Galaxy S25 Ultra (512 GB) - Titanio Negro' },
+]
+
+function PriceCompetitivenessPlayground({ component }: { component: SummaryComponent }) {
+  const [showTitle, setShowTitle] = useState(true)
+  const [showBenefits, setShowBenefits] = useState(true)
+  const [title, setTitle] = useState(component.name)
+  const [affectedCount, setAffectedCount] = useState('16 publicaciones')
+  const [products, setProducts] = useState(initialPriceProducts)
+  const [state, setState] = useState<PriceCompetitivenessState>('Normal')
+  const [darkMode, setDarkMode] = useState(false)
+  const [interaction, setInteraction] = useState('Prueba el acceso a las publicaciones no competitivas.')
+  const benefits = ['Tarifa de venta reducida en categorías seleccionadas.', 'Acceso a campañas con inversión de Mercado Libre.']
+  const updateProduct = (id: string, name: string) => setProducts((current) => current.map((product) => product.id === id ? { ...product, name } : product))
+
+  return <div className="playground-layout">
+    <aside className="playground-controls" aria-label="Propiedades del componente">
+      <section><h2>Propiedades</h2><Toggle label="Título del componente" checked={showTitle} onChange={setShowTitle} /><Toggle label="Beneficios afectados" checked={showBenefits} onChange={setShowBenefits} /></section>
+      <section><h2>Contenido</h2><label className="playground-field"><span>Título</span><input value={title} onChange={(event) => setTitle(event.target.value)} /></label><label className="playground-field"><span>Publicaciones no competitivas</span><input value={affectedCount} onChange={(event) => setAffectedCount(event.target.value)} /></label>{products.map((product, index) => <label className="playground-field" key={product.id}><span>Publicación {index + 1}</span><input value={product.name} onChange={(event) => updateProduct(product.id, event.target.value)} /></label>)}</section>
+      <section><h2>Estado</h2><label className="playground-field"><span>Componente completo</span><select value={state} onChange={(event) => setState(event.target.value as PriceCompetitivenessState)}><option>Normal</option><option>Cargando</option><option>Sin datos</option><option>Error</option><option>No disponible</option></select></label></section>
+      <section><h2>Tema</h2><Toggle label="Modo oscuro" checked={darkMode} onChange={setDarkMode} /></section>
+    </aside>
+    <section className="playground-stage" aria-label="Vista previa en tiempo real"><strong className="playground-stage__label">Vista previa en tiempo real</strong><div className={`preview-canvas preview-canvas--price-competitiveness ${darkMode ? 'preview-canvas--dark' : ''}`}><PriceCompetitivenessCard title={title} affectedCount={affectedCount} benefits={showBenefits ? benefits : []} products={products} showTitle={showTitle} state={state} onNavigate={() => setInteraction('Se abrirían Publicaciones con el filtro de precio no competitivo.')} onOpenProducts={() => setInteraction('Se abriría el listado filtrado de publicaciones no competitivas.')} onRetry={() => { setState('Normal'); setInteraction('Los datos se recuperaron correctamente.') }} /></div><p className="playground-stage__feedback" aria-live="polite">{interaction}</p></section>
+  </div>
 }
