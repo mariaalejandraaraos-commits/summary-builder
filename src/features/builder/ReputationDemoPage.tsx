@@ -28,7 +28,9 @@ import demoStyles from './reputation-demo.css?raw'
 import appStyles from '../../App.css?raw'
 import { downloadContextHtml } from './exportCardHtml'
 import { SummaryTemplatePreview } from './SummaryTemplatePreview'
-import { templateColumns, type TemplatePlacement } from './summary-template-layout'
+import { placementLabel, suggestTemplatePlacement, templateColumns, type TemplatePlacement } from './summary-template-layout'
+import { monthlyPrompt, type MonthlyFrame } from '../../monthly-sequence'
+import { MonthlyGeneration } from '../../monthly-generation'
 import './reputation-demo.css'
 
 const contextStyles = appStyles
@@ -94,6 +96,7 @@ type DemoConfig = {
   order: SlotId[]
   slots: Record<SlotId, DemoSlot>
   placement: TemplatePlacement
+  placementCustomized: boolean
 }
 
 type LocalAiProposal = {
@@ -221,7 +224,16 @@ function createConfig(prefill: boolean): DemoConfig {
       'slot-3': defaultSlotForRole('slot-3', 'news'),
     },
     placement: { column: 2, after: 'reputation' },
+    placementCustomized: false,
   }
+}
+
+function placementSuggestion(config: DemoConfig) {
+  return suggestTemplatePlacement({
+    title: config.title,
+    ideaPrompt: config.ideaPrompt,
+    slots: config.order.map((id) => config.slots[id]),
+  })
 }
 
 function variantName(variant: SlotVariant) { return variantNames[variant] }
@@ -309,7 +321,7 @@ function readSavedSession(prefill: boolean): StoredSession | null {
     const savedPlacement = stored.config.placement
     const placement = Number.isInteger(savedPlacement?.column) && savedPlacement.column >= 0 && savedPlacement.column < templateColumns.length
       && (savedPlacement.after === null || templateColumns[savedPlacement.column].some((card) => card.id === savedPlacement.after))
-      ? savedPlacement : defaults.placement
+      ? { ...savedPlacement, after: savedPlacement.after ?? templateColumns[savedPlacement.column][0].id } : defaults.placement
     return {
       version: 4,
       savedAt: typeof stored.savedAt === 'string' ? stored.savedAt : '',
@@ -322,6 +334,9 @@ function readSavedSession(prefill: boolean): StoredSession | null {
         order,
         slots,
         placement,
+        placementCustomized: stored.config.placementCustomized === undefined
+          ? placement.column !== defaults.placement.column || placement.after !== defaults.placement.after
+          : Boolean(stored.config.placementCustomized),
       },
       device: stored.device === 'mobile' ? 'mobile' : 'desktop',
     }
@@ -996,22 +1011,50 @@ function MobileContextPreview({ config }: { config: DemoConfig }) {
   </section>
 }
 
-export function ReputationDemoPage({ prefill = false, onOpenLibrary }: { prefill?: boolean; onOpenLibrary: () => void }) {
-  const [restoredSession] = useState<StoredSession | null>(() => readSavedSession(prefill))
-  const [config, setConfig] = useState<DemoConfig>(() => restoredSession?.config ?? createConfig(prefill))
-  const [showGuidedStart, setShowGuidedStart] = useState(!prefill && !restoredSession)
-  const [builderStage, setBuilderStage] = useState<BuilderStage>('build')
-  const [templateVisited, setTemplateVisited] = useState(false)
+function monthlyConfig({ phase, title, prompt }: MonthlyFrame) {
+  const result = buildCardDraft(monthlyPrompt)
+  const draft = 'config' in result ? result.config : createConfig(false)
+  const next = createConfig(false)
+  next.order = [...allSlotIds]
+  next.title = title
+  next.footer = phase >= 3 ? 'Ir a Mi página' : ''
+  if (phase >= 3) next.slots['slot-1'] = { ...draft.slots['slot-1'], source: 'library', label: '10 seguidores', value: 'Ver seguidores', description: 'Débil', prompt: '', promptApplied: false }
+  if (phase >= 4) {
+    next.ideaPrompt = prompt
+    next.slots['slot-2'] = { ...next.slots['slot-2'], source: 'prompt', enabled: phase === 5 }
+  }
+  if (phase >= 6) {
+    next.slots = draft.slots
+    next.slots['slot-1'] = { ...draft.slots['slot-1'], source: 'library', label: '10 seguidores', value: 'Ver seguidores', description: 'Débil', prompt: '', promptApplied: false }
+    next.ideaPrompt = monthlyPrompt
+  }
+  next.placement = { column: 2, after: null }
+  return next
+}
+
+export function ReputationDemoPage({ prefill = false, onOpenLibrary, monthlyFrame }: { prefill?: boolean; onOpenLibrary: () => void; monthlyFrame?: MonthlyFrame }) {
+  const [restoredSession] = useState<StoredSession | null>(() => monthlyFrame ? null : readSavedSession(prefill))
+  const [isMonthly] = useState(Boolean(monthlyFrame))
+  const [savedConfig, setConfig] = useState<DemoConfig>(() => restoredSession?.config ?? createConfig(prefill))
+  const config = monthlyFrame ? monthlyConfig(monthlyFrame) : savedConfig
+  const [savedGuidedStart, setShowGuidedStart] = useState(!prefill && !restoredSession)
+  const showGuidedStart = monthlyFrame ? false : savedGuidedStart
+  const [savedStage, setBuilderStage] = useState<BuilderStage>('build')
+  const builderStage: BuilderStage = monthlyFrame ? monthlyFrame.phase >= 8 ? 'mobile' : monthlyFrame.phase >= 7 ? 'template' : 'build' : savedStage
+  const [savedTemplateVisited, setTemplateVisited] = useState(false)
+  const templateVisited = monthlyFrame ? monthlyFrame.phase >= 7 : savedTemplateVisited
   const [device, setDevice] = useState<'desktop' | 'mobile'>(() => restoredSession?.device ?? 'desktop')
   const sessionStatus = restoredSession ? 'Sesión restaurada · guardado local' : 'Guardado local en este navegador'
-  const [selected, setSelected] = useState<SlotId | 'title' | 'footer' | null>(null)
+  const [savedSelected, setSelected] = useState<SlotId | 'title' | 'footer' | null>(null)
+  const selected = monthlyFrame ? monthlyFrame.phase < 1 ? null : monthlyFrame.phase === 1 ? 'title' : monthlyFrame.phase <= 3 ? 'slot-1' : 'slot-2' : savedSelected
   const [dragOver, setDragOver] = useState<SlotId | null>(null)
   const [notice, setNotice] = useState('')
   const [figmaImportingSlot, setFigmaImportingSlot] = useState<SlotId | null>(null)
   const [figmaImportError, setFigmaImportError] = useState('')
   const [figmaNeedsConnection, setFigmaNeedsConnection] = useState(false)
   const [figmaDemoFile, setFigmaDemoFile] = useState<{ slotId: SlotId; file: File } | null>(null)
-  const [generatingSlot, setGeneratingSlot] = useState<SlotId | null>(null)
+  const [savedGeneratingSlot, setGeneratingSlot] = useState<SlotId | null>(null)
+  const generatingSlot = monthlyFrame ? monthlyFrame.phase === 5 ? 'slot-2' : null : savedGeneratingSlot
   const [generationStep, setGenerationStep] = useState<'analyzing' | 'assembling'>('analyzing')
   const [generatingAlternative, setGeneratingAlternative] = useState(false)
   const [ideaFeedbackOpen, setIdeaFeedbackOpen] = useState(false)
@@ -1026,6 +1069,7 @@ export function ReputationDemoPage({ prefill = false, onOpenLibrary }: { prefill
   useEffect(() => () => { generationTimers.current.forEach(window.clearTimeout) }, [])
 
   useEffect(() => {
+    if (isMonthly) return
     if (window.location.protocol === 'file:') return
     let active = true
     void fetch('/api/local-ai/status')
@@ -1033,12 +1077,13 @@ export function ReputationDemoPage({ prefill = false, onOpenLibrary }: { prefill
       .then((status) => { if (active) setLocalAiReady(Boolean(status?.available)) })
       .catch(() => { if (active) setLocalAiReady(false) })
     return () => { active = false }
-  }, [])
+  }, [isMonthly])
 
   useEffect(() => {
+    if (isMonthly) return
     if (showGuidedStart) return
     writeSavedSession(config, device, prefill)
-  }, [config, device, prefill, showGuidedStart])
+  }, [config, device, prefill, showGuidedStart, isMonthly])
 
   useEffect(() => {
     if (showGuidedStart || builderStage === 'build') return
@@ -1264,7 +1309,7 @@ export function ReputationDemoPage({ prefill = false, onOpenLibrary }: { prefill
         if (generationRequest.current !== requestId) return
         setConfig((current) => {
           if (current.ideaPrompt.trim() !== prompt) return current
-          return result.config
+          return { ...result.config, placement: placementSuggestion(result.config).placement, placementCustomized: false }
         })
         setGeneratingSlot(null)
         setGeneratingAlternative(false)
@@ -1316,7 +1361,9 @@ export function ReputationDemoPage({ prefill = false, onOpenLibrary }: { prefill
   const selectedSlot = selected && selected !== 'title' && selected !== 'footer' && config.order.includes(selected) ? selected : null
   const hasIdeaDraft = Boolean(config.ideaPrompt.trim() && config.slots['slot-1'].promptApplied)
   const hasPreviewContent = config.order.some((id) => config.slots[id].enabled)
-  const readiness = getCardReadiness(config)
+  const readiness = monthlyFrame?.phase === 5 ? { ...getCardReadiness(config), label: 'Creando propuesta', canReview: false, canShare: false } : getCardReadiness(config)
+  const suggestedPlacement = placementSuggestion(config)
+  const suggestionApplied = config.placement.column === suggestedPlacement.placement.column && config.placement.after === suggestedPlacement.placement.after
   const mobileChecks = getMobileChecks(config, readiness)
   const mobileReady = mobileChecks.every((check) => check.complete)
   const templateChecks = [
@@ -1327,6 +1374,7 @@ export function ReputationDemoPage({ prefill = false, onOpenLibrary }: { prefill
   ]
   const moveToTemplate = () => {
     if (!readiness.canReview) return
+    if (!config.placementCustomized) setConfig((current) => ({ ...current, placement: placementSuggestion(current).placement }))
     setBuilderStage('template')
     setTemplateVisited(true)
     setNotice('Revisa ahora cómo se integra la card en el Template desktop.')
@@ -1384,7 +1432,7 @@ export function ReputationDemoPage({ prefill = false, onOpenLibrary }: { prefill
           <div className="reputation-demo__canvas-heading"><div><p className="eyebrow">Vista previa</p><h2 id="reputation-demo-preview-title">Card en construcción</h2></div><fieldset className="reputation-demo__device-options"><legend className="visually-hidden">Tamaño de vista previa</legend><label><input type="radio" name="reputation-demo-device" checked={device === 'desktop'} onChange={() => setDevice('desktop')} /><span>Desktop</span></label><label><input type="radio" name="reputation-demo-device" checked={device === 'mobile'} onChange={() => setDevice('mobile')} /><span>Mobile</span></label></fieldset></div>
           <div className="reputation-demo__stage" data-device={device}>
             <article className={`reputation-demo__card${hasPreviewContent ? '' : ' reputation-demo__card--empty'}`} aria-label="Vista previa de la card en construcción">
-              {hasPreviewContent && <header className={`reputation-demo__card-header${selected === 'title' ? ' is-selected' : ''}`}>
+              {(hasPreviewContent || monthlyFrame) && <header className={`reputation-demo__card-header${selected === 'title' ? ' is-selected' : ''}`}>
                 <label className="visually-hidden" htmlFor="reputation-demo-card-title">Título de la card</label>
                 <input id="reputation-demo-card-title" value={config.title} placeholder="Título de la card" onFocus={() => setSelected('title')} onChange={(event) => setConfig((current) => ({ ...current, title: event.target.value, autoTitle: false }))} />
               </header>}
@@ -1397,7 +1445,7 @@ export function ReputationDemoPage({ prefill = false, onOpenLibrary }: { prefill
                       <div className="reputation-demo__figma-render"><img src={slot.figmaImageDataUrl} alt={`Diseño de Figma en Slot ${slotNumber}`} /></div>
                       <button type="button" className="reputation-demo__edit-figma" onClick={() => setSelected(id)} aria-label={`Editar Slot ${slotNumber}: diseño de Figma`}>Editar slot</button>
                     </div> : <button type="button" className={`reputation-demo__filled-slot reputation-demo__filled-slot--${slot.source === 'library' || slot.usesLibraryVariant ? slot.variant : slot.source}${selected === id ? ' is-selected' : ''}`} data-tone={slot.tone} onClick={() => setSelected(id)} aria-label={`Editar Slot ${slotNumber}, ${slotRoles[id].name}: ${slotContentName(slot)}`}>
-                      <SlotPreviewContent slot={slot} isGenerating={generatingSlot === id} generationStep={generationStep} />
+                      {monthlyFrame && generatingSlot === id ? <MonthlyGeneration /> : <SlotPreviewContent slot={slot} isGenerating={generatingSlot === id} generationStep={generationStep} />}
                     </button> : <button type="button" className="reputation-demo__empty-slot" onClick={() => fillSlot(id)} aria-label={`${slotRoles[id].emptyAction} en Slot ${slotNumber}`}><span aria-hidden="true">⇄</span><span>{slotRoles[id].emptyAction}</span></button>}
                     {slot.enabled && slot.source === 'figma' && validFigmaUrl(slot.figmaUrl) && slot.figmaImageDataUrl && <a className="reputation-demo__figma-open" href={slot.figmaUrl} target="_blank" rel="noreferrer">Abrir en Figma ↗</a>}
                     <button type="button" className="reputation-demo__delete-slot" onClick={() => removeSlot(id)} aria-label={`Eliminar Slot ${slotNumber}`} title={`Eliminar Slot ${slotNumber}`}><X size={15} aria-hidden="true" /></button>
@@ -1405,7 +1453,7 @@ export function ReputationDemoPage({ prefill = false, onOpenLibrary }: { prefill
                 })}
                 {config.order.length === 0 && <div className="reputation-demo__no-slots"><strong>1. Agrega un slot</strong><span>Desde Construcción de la card.</span><strong>2. Elige su contenido</strong><span>En Propiedades, a la derecha.</span></div>}
               </div>
-              {hasPreviewContent && <button type="button" className={`reputation-demo__card-footer${selected === 'footer' ? ' is-selected' : ''}`} onClick={() => setSelected('footer')} aria-label={config.footer || 'Configurar la acción de la card'}><span>{config.footer || 'Agregar acción'}</span><span aria-hidden="true">›</span></button>}
+              {(hasPreviewContent || monthlyFrame) && <button type="button" className={`reputation-demo__card-footer${selected === 'footer' ? ' is-selected' : ''}`} onClick={() => setSelected('footer')} aria-label={config.footer || 'Configurar la acción de la card'}><span>{config.footer || 'Agregar acción'}</span><span aria-hidden="true">›</span></button>}
             </article>
           </div>
           <p className="reputation-demo__canvas-hint">Card Desktop: 270 px · Máximo tres slots. Pasa el cursor por uno para eliminarlo.</p>
@@ -1486,8 +1534,9 @@ export function ReputationDemoPage({ prefill = false, onOpenLibrary }: { prefill
           <TemplateContextPreview config={config} />
           <aside className="builder-review__panel">
             <h3>Ubicación sugerida</h3>
-            <div className="builder-review__recommendation"><strong>Columna 3 · después de Reputación</strong><p>Es una referencia para una card de métricas. Conserva la lectura visual y no confirma elegibilidad ni comportamiento productivo.</p><button type="button" className="builder-review__use-placement" onClick={() => setConfig((current) => ({ ...current, placement: { column: 2, after: 'reputation' } }))}>Usar ubicación sugerida</button></div>
-            <details className="builder-review__placement-details"><summary>Ajustar posición manualmente</summary><div className="builder-review__placement"><label>Columna<select value={config.placement.column} onChange={(event) => setConfig((current) => ({ ...current, placement: { column: Number(event.target.value), after: null } }))}>{templateColumns.map((_, index) => <option key={index} value={index}>Columna {index + 1}</option>)}</select></label><label>Posición<select value={config.placement.after ?? ''} onChange={(event) => setConfig((current) => ({ ...current, placement: { ...current.placement, after: event.target.value || null } }))}><option value="">Al inicio de la columna</option>{templateColumns[config.placement.column].map((card) => <option key={card.id} value={card.id}>Después de {card.label}</option>)}</select></label></div></details>
+            <div className="builder-review__recommendation"><strong>{placementLabel(suggestedPlacement.placement)}</strong><p>{suggestedPlacement.reason}</p><p>{suggestedPlacement.review}</p><small>{suggestionApplied ? 'Ubicación sugerida aplicada en el template' : `Ubicación actual: ${placementLabel(config.placement)}`}</small>{!suggestionApplied && <button type="button" className="builder-review__use-placement" onClick={() => setConfig((current) => ({ ...current, placement: placementSuggestion(current).placement, placementCustomized: false }))}>Usar ubicación sugerida</button>}</div>
+            <p>Criterio: Guideline Summary · Organización, contrastado con este MASTER. Aquí Reputación aparece en la columna 3 y Novedades en la 4, mientras el Guideline las ubica en la 4. El orden en «Z» y la compensación de alturas dependen de las cards y medidas reales; esta ubicación se valida con Summary.</p>
+            <details className="builder-review__placement-details"><summary>Ajustar posición manualmente</summary><div className="builder-review__placement"><label>Columna<select value={config.placement.column} onChange={(event) => setConfig((current) => { const column = Number(event.target.value); return { ...current, placement: { column, after: templateColumns[column][0].id }, placementCustomized: true } })}>{templateColumns.map((_, index) => <option key={index} value={index}>Columna {index + 1}</option>)}</select></label><label>Posición<select value={config.placement.after ?? templateColumns[config.placement.column][0].id} onChange={(event) => setConfig((current) => ({ ...current, placement: { ...current.placement, after: event.target.value }, placementCustomized: true }))}>{templateColumns[config.placement.column].map((card) => <option key={card.id} value={card.id}>Después de {card.label}</option>)}</select></label></div><p>Las cuatro cards iniciales del ejemplo mantienen su posición.</p></details>
             <p>La card aparece marcada en azul dentro de la grilla completa del template de Figma.</p>
             <h3>Checklist de contexto</h3>
             <ul className="builder-review__checklist">{templateChecks.map((check) => <li className={check.complete ? 'is-complete' : 'is-pending'} key={check.label}><span aria-hidden="true">{check.complete ? '✓' : '!'}</span>{check.label}</li>)}</ul>
