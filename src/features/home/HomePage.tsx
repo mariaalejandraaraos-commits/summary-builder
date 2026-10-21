@@ -17,7 +17,7 @@ export function HomePage({ onOpenBuilder, onOpenLibrary }: HomePageProps) {
       <div className="home-page__choices">
         <button className="home-choice home-choice--builder" type="button" onClick={onOpenBuilder}>
           <span className="home-choice__top"><span className="home-choice__icon" aria-hidden="true"><LayoutTemplate size={25} strokeWidth={1.7} /></span><ArrowUpRight className="home-choice__arrow" size={22} aria-hidden="true" /></span>
-          <span className="home-choice__content"><strong>Builder</strong><span>Revisa si necesitas una card nueva y arma una primera propuesta o empieza desde cero.</span></span>
+          <span className="home-choice__content"><strong>Builder</strong><span>Crea y configura una card con los componentes de Summary.</span></span>
           <span className="home-choice__action">Crear una card <span aria-hidden="true">→</span></span>
         </button>
 

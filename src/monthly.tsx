@@ -43,7 +43,6 @@ const cues = [
 ]
 const phaseAt = (time: number) => chapters.reduce((phase, chapter, index) => time >= chapter.at ? index : phase, 0)
 const Builder = memo(ReputationDemoPage)
-const noop = () => undefined
 
 export function Monthly() {
   const [time, setTime] = useState(0)
@@ -174,7 +173,7 @@ export function Monthly() {
     <div className="monthly-frame" style={{ width: 1600 * scale, height: 900 * scale }}>
       <div ref={view} className={'monthly-view' + (playing ? '' : ' is-paused')} data-phase={phase} style={{ transform: 'scale(' + scale + ')', opacity: time > duration - .4 ? (duration - time) / .4 : Math.min(1, time / .3) }}>
         <AppShell route={{ name: 'builder-editor' }} onNavigate={() => undefined}>
-          <Builder onOpenLibrary={noop} monthlyFrame={frame} />
+          <Builder monthlyFrame={frame} />
         </AppShell>
         {menuOpen && <div className="monthly-menu" ref={menu}><span>Data Graphic</span><span>Value basic</span><b>✓ Data gauge</b><span>Fallback</span><span>State description</span><span>News</span><span>Reputation</span><span>Card de recomendaciones</span></div>}
         <div className="monthly-flight-layer" ref={flightLayer} aria-hidden="true" />

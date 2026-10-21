@@ -55,7 +55,7 @@ function App() {
         {route.name === 'builder-editor' && (
           initialComponentId && initialComponentId !== 'reputation'
             ? <SummaryBuilderPage key={cardDraftId} components={components} initialComponentId={initialComponentId} />
-            : <ReputationDemoPage key={cardDraftId} prefill={initialComponentId === 'reputation'} onOpenLibrary={() => setRoute({ name: 'library' })} />
+            : <ReputationDemoPage key={cardDraftId} prefill={initialComponentId === 'reputation'} />
         )}
         {route.name === 'library' && <ComponentsCatalogPage components={components} onOpenComponent={openComponent} onAddToBuilder={addComponent} />}
         {route.name === 'component-detail' && selectedComponent && (
