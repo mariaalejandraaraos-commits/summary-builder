@@ -106,26 +106,7 @@ type LocalAiProposal = {
   slots: { role?: string; variant: string; label: string; value: string; description: string }[]
 }
 
-type GuidedGoal = 'metric' | 'chart' | 'money' | 'news' | 'other'
-type GuidedAnswers = {
-  goal: GuidedGoal | null
-  subject: string
-  value: string
-  context: string
-  period: 'Hoy' | 'Últimos 7 días' | 'Últimos 30 días'
-  action: string
-}
-
 type BuilderStage = 'build' | 'template' | 'mobile'
-
-const initialGuidedAnswers: GuidedAnswers = { goal: null, subject: '', value: '', context: '', period: 'Hoy', action: '' }
-const guidedGoals: { id: GuidedGoal; label: string; description: string }[] = [
-  { id: 'metric', label: 'Mostrar un dato o métrica', description: 'Destacar un valor y darle contexto.' },
-  { id: 'chart', label: 'Mostrar una tendencia o gráfico', description: 'Ver cómo cambia un dato en el tiempo.' },
-  { id: 'money', label: 'Mostrar un monto', description: 'Ingresos, saldo u otro valor monetario.' },
-  { id: 'news', label: 'Comunicar una novedad', description: 'Presentar algo nuevo o importante.' },
-  { id: 'other', label: 'Otra idea', description: 'Describir libremente qué quieres mostrar.' },
-]
 
 const allSlotIds: SlotId[] = ['slot-1', 'slot-2', 'slot-3']
 const slotRoles: Record<SlotId, { name: string; description: string; emptyAction: string }> = {
@@ -738,131 +719,6 @@ function getMobileChecks(config: DemoConfig, readiness: CardReadiness) {
   ]
 }
 
-function guidedPrompt(answers: GuidedAnswers) {
-  const subject = answers.subject.trim()
-  const context = answers.context.trim()
-  switch (answers.goal) {
-    case 'metric': return `Mostrar una métrica${subject ? ` de ${subject}` : ''} para ${answers.period.toLowerCase()}.${answers.value.trim() ? ` Valor ilustrativo: ${answers.value.trim()}.` : ''} ${context}`.trim()
-    case 'chart': return `Mostrar un gráfico de ${subject || 'un dato'} para ${answers.period.toLowerCase()}.${answers.value.trim() ? ` Valor ilustrativo: ${answers.value.trim()}.` : ''} ${context}`.trim()
-    case 'money': return `Mostrar un monto de ${subject || 'dinero'} para ${answers.period.toLowerCase()}.${answers.value.trim() ? ` Monto ilustrativo: ${answers.value.trim()}.` : ''} ${context}`.trim()
-    case 'news': return `Mostrar una novedad: ${subject || 'información relevante para el seller'}.${context ? ` ${context}` : ''}`
-    case 'other': return subject || 'Mostrar información relevante para el seller.'
-    default: return ''
-  }
-}
-
-function guidedConfig(answers: GuidedAnswers): DemoConfig {
-  const config = createConfig(false)
-  if (!answers.goal) return config
-  const prompt = guidedPrompt(answers)
-  const subject = answers.subject.trim()
-  const context = answers.context.trim()
-  const sketch = buildPromptSketch(prompt)
-  if (answers.goal === 'metric') {
-    sketch.kind = 'metric'
-    sketch.title = subject || 'Dato principal'
-    sketch.cardTitle = 'Métrica'
-    sketch.cta = 'Ver detalle'
-    sketch.period = answers.period
-    sketch.value = answers.value.trim() || '1.248'
-    sketch.support = context || 'vs. período anterior'
-    sketch.interpretation = 'Métrica destacada'
-  } else if (answers.goal === 'chart') {
-    sketch.kind = 'chart'
-    sketch.title = subject ? `Tendencia de ${subject}` : 'Tendencia reciente'
-    sketch.cardTitle = 'Tendencia'
-    sketch.cta = 'Ver detalle'
-    sketch.period = answers.period
-    sketch.value = answers.value.trim() || '1.248'
-    sketch.support = context || 'vs. período anterior'
-    sketch.interpretation = 'Gráfico de tendencia'
-  } else if (answers.goal === 'money') {
-    sketch.kind = 'metric'
-    sketch.title = subject || 'Monto principal'
-    sketch.cardTitle = 'Monto'
-    sketch.cta = 'Ver detalle'
-    sketch.period = answers.period
-    sketch.value = answers.value.trim() || '$ 1.248.500'
-    sketch.support = context || (answers.period === 'Hoy' ? 'vs. ayer' : 'vs. período anterior')
-    sketch.interpretation = 'Monto destacado'
-  } else if (answers.goal === 'news') {
-    sketch.kind = 'message'
-    sketch.title = subject || 'Una novedad para tu negocio'
-    sketch.cardTitle = 'Novedad'
-    sketch.cta = 'Conocer más'
-    sketch.support = context || 'Conoce los detalles de esta novedad.'
-    sketch.interpretation = 'Bloque de contenido'
-  } else if (answers.goal === 'other') {
-    sketch.cardTitle = 'Nueva card'
-    sketch.cta = 'Ver detalle'
-  }
-  sketch.andesPattern = andesPatternForSketch(sketch.kind)
-  config.title = ''
-  config.footer = answers.action.trim()
-  config.ideaPrompt = prompt
-  config.order = ['slot-1']
-  config.slots['slot-1'] = { ...defaultSlot('value', true), source: 'prompt', prompt, promptApplied: true, sketch }
-  return config
-}
-
-function GuidedPrecheck({ onContinue, onOpenLibrary, onBlank }: { onContinue: () => void; onOpenLibrary: () => void; onBlank: () => void }) {
-  const [showGuidance, setShowGuidance] = useState(false)
-
-  return <section className="guided-start guided-start--precheck" aria-labelledby="guided-precheck-title">
-    <header className="guided-start__intro"><p className="eyebrow">Builder · Antes de empezar</p><h1 id="guided-precheck-title">¿Necesitas crear una card nueva?</h1><p>Elige cómo avanzar con tu idea para Summary.</p></header>
-    <div className="guided-start__precheck-layout">
-      <div className="guided-start__precheck-options reputation-demo__panel">
-        <h2>¿En qué punto estás?</h2>
-        <div className="guided-start__precheck-choices">
-          <button type="button" onClick={onContinue}><strong>Quiero proponer una card nueva</strong><span>Responde tres preguntas y arma una primera propuesta editable.</span><span className="guided-start__precheck-arrow" aria-hidden="true">→</span></button>
-          <button type="button" onClick={onOpenLibrary}><strong>Quiero revisar las cards existentes</strong><span>Busca una card o un caso de uso que ya resuelva la necesidad.</span><span className="guided-start__precheck-arrow" aria-hidden="true">→</span></button>
-          <button type="button" aria-pressed={showGuidance} onClick={() => setShowGuidance((current) => !current)}><strong>No sé si corresponde una card</strong><span>Revisa unas preguntas breves antes de crearla.</span><span className="guided-start__precheck-arrow" aria-hidden="true">→</span></button>
-        </div>
-        <div className="guided-start__precheck-footer"><button type="button" className="guided-start__text-button" onClick={onBlank}>Crear desde cero</button></div>
-      </div>
-      <aside id="guided-precheck-guidance" className="guided-start__precheck-guidance reputation-demo__panel" aria-live="polite">
-        <p className="eyebrow">Para orientarte</p>
-        <h2>{showGuidance ? 'Revisa la necesidad antes de diseñar' : 'Empieza por la necesidad del seller'}</h2>
-        {showGuidance ? <><ul><li>¿Qué necesita entender o hacer el seller en Summary?</li><li>¿Una card existente ya lo muestra?</li><li>¿Alcanza con un bloque de información y una acción, o hace falta otro recorrido?</li></ul><p>Si hace falta otro recorrido, revisa el caso con el equipo Summary antes de diseñar una card.</p><div className="guided-start__precheck-actions"><button type="button" className="button button--primary" onClick={onOpenLibrary}>Explorar Librería</button><button type="button" className="guided-start__back" onClick={onContinue}>Seguir con mi idea</button></div></> : <p>Si ya sabes qué debe mostrar una card nueva, continúa con las preguntas. Si buscas un patrón existente, explora la Librería.</p>}
-      </aside>
-    </div>
-  </section>
-}
-
-function GuidedStart({ onCreate, onBlank, onOpenLibrary }: { onCreate: (config: DemoConfig) => void; onBlank: () => void; onOpenLibrary: () => void }) {
-  const [showPrecheck, setShowPrecheck] = useState(true)
-  const [step, setStep] = useState(0)
-  const [answers, setAnswers] = useState<GuidedAnswers>(initialGuidedAnswers)
-  const update = (patch: Partial<GuidedAnswers>) => setAnswers((current) => ({ ...current, ...patch }))
-  const preview = guidedConfig(answers)
-  const slot = preview.slots['slot-1']
-
-  if (showPrecheck) return <GuidedPrecheck onContinue={() => setShowPrecheck(false)} onOpenLibrary={onOpenLibrary} onBlank={onBlank} />
-
-  return <section className="guided-start" aria-labelledby="guided-start-title">
-    <header className="guided-start__intro"><p className="eyebrow">Builder · Nueva card</p><h1 id="guided-start-title">Arma tu primera propuesta</h1><p>Responde unas preguntas para preparar una card editable.</p></header>
-    <div className="guided-start__layout">
-      <div className="guided-start__questions reputation-demo__panel">
-        <div className="guided-start__progress" aria-label={`Pregunta ${step + 1} de 3`}><span>Pregunta {step + 1} de 3</span><div aria-hidden="true"><i style={{ width: `${(step + 1) / 3 * 100}%` }} /></div></div>
-        {step === 0 && <div className="guided-start__step"><h2>¿Qué tipo de contenido quieres mostrar?</h2><p>Elige una forma de presentar la información. Después podrás definir el tema y los datos.</p><fieldset className="guided-start__goals"><legend className="visually-hidden">Tipo de contenido</legend>{guidedGoals.map((goal) => <label key={goal.id}><input type="radio" name="guided-goal" checked={answers.goal === goal.id} onChange={() => update({ goal: goal.id, subject: '', context: '', value: '', period: 'Hoy', action: '' })} /><span><strong>{goal.label}</strong><small>{goal.description}</small></span></label>)}</fieldset></div>}
-        {step === 1 && <div className="guided-start__step"><h2>¿Qué información debería destacar?</h2><p>Completa lo que sepas. Puedes dejar los campos vacíos y ajustar la propuesta después.</p>
-          {(answers.goal === 'metric' || answers.goal === 'chart' || answers.goal === 'money') && <>
-            <label className="guided-start__field">{answers.goal === 'chart' ? '¿Qué dato cambia en el tiempo?' : answers.goal === 'money' ? '¿Qué monto quieres mostrar?' : '¿Qué dato quieres destacar?'}<input value={answers.subject} onChange={(event) => update({ subject: event.target.value })} placeholder={answers.goal === 'chart' ? 'Ej.: visitas a las publicaciones' : answers.goal === 'money' ? 'Ej.: ingresos, saldo disponible' : 'Ej.: pedidos entregados'} /></label>
-            <label className="guided-start__field">Período<select value={answers.period} onChange={(event) => update({ period: event.target.value as GuidedAnswers['period'] })}><option>Hoy</option><option>Últimos 7 días</option><option>Últimos 30 días</option></select></label>
-            <label className="guided-start__field">{answers.goal === 'money' ? 'Monto ilustrativo (opcional)' : 'Valor ilustrativo (opcional)'}<input value={answers.value} onChange={(event) => update({ value: event.target.value })} placeholder={answers.goal === 'money' ? '$ 1.248.500' : '1.248'} /></label>
-            <label className="guided-start__field">¿Qué comparación o contexto importa? (opcional)<input value={answers.context} onChange={(event) => update({ context: event.target.value })} placeholder="Ej.: frente al período anterior" /></label>
-          </>}
-          {answers.goal === 'news' && <><label className="guided-start__field">¿Qué quieres comunicar?<input value={answers.subject} onChange={(event) => update({ subject: event.target.value })} placeholder="Ej.: una nueva herramienta para vender" /></label><label className="guided-start__field">¿Qué detalle ayuda a entenderlo? (opcional)<input value={answers.context} onChange={(event) => update({ context: event.target.value })} placeholder="Ej.: ya está disponible para tu negocio" /></label></>}
-          {answers.goal === 'other' && <label className="guided-start__field">Describe tu idea (opcional)<textarea rows={4} value={answers.subject} onChange={(event) => update({ subject: event.target.value })} placeholder="Ej.: mostrar el estado de un objetivo" /></label>}
-        </div>}
-        {step === 2 && <div className="guided-start__step"><h2>¿Qué debería poder hacer después?</h2><p>Sugiere el texto de la acción. Si lo dejas vacío, podrás configurarlo después en la card.</p><label className="guided-start__field">Acción de la card (opcional)<input value={answers.action} onChange={(event) => update({ action: event.target.value })} placeholder="Ej.: Ver mis pedidos" /></label></div>}
-        <div className="guided-start__navigation"><button type="button" className="guided-start__text-button" onClick={onBlank}>Crear desde cero</button><div><button type="button" className="guided-start__back" onClick={() => step > 0 ? setStep(step - 1) : setShowPrecheck(true)}>Anterior</button>{step < 2 ? <button type="button" className="button button--primary" disabled={step === 0 && !answers.goal} onClick={() => setStep(step + 1)}>Continuar</button> : <button type="button" className="button button--primary" onClick={() => onCreate(preview)}>Usar esta propuesta</button>}</div></div>
-      </div>
-      <div className="guided-start__preview reputation-demo__panel"><div className="guided-start__preview-heading"><p className="eyebrow">Vista previa</p><h2>Primera propuesta</h2><p>Se actualiza con tus respuestas.</p></div><div className="guided-start__preview-stage"><span className="guided-start__example-label">Ejemplo ilustrativo</span><article className="reputation-demo__card" aria-label="Vista previa de la primera propuesta"><header className="reputation-demo__card-header"><strong>{preview.title || 'Título de la card'}</strong></header><div className="reputation-demo__card-body">{slot.enabled ? <><div className="reputation-demo__filled-slot reputation-demo__filled-slot--prompt"><SlotPreviewContent slot={slot} /></div><div className="reputation-demo__empty-slot guided-start__empty-slot">Información complementaria disponible</div><div className="reputation-demo__empty-slot guided-start__empty-slot">Recomendaciones contextuales disponibles</div></> : <><div className="reputation-demo__empty-slot guided-start__empty-slot">Información principal disponible</div><div className="reputation-demo__empty-slot guided-start__empty-slot">Información complementaria disponible</div><div className="reputation-demo__empty-slot guided-start__empty-slot">Recomendaciones contextuales disponibles</div></>}</div><div className="reputation-demo__card-footer"><span>{preview.footer || 'Agregar acción'}</span><span aria-hidden="true">›</span></div></article></div><p className="guided-start__disclaimer">Los valores de ejemplo son ilustrativos. Esta primera propuesta todavía no valida lineamientos ni usa IA.</p></div>
-    </div>
-  </section>
-}
-
 function ReputationThermometer({ tone }: { tone: ReputationTone }) {
   return <span role="img" className={`demo-reputation-meter demo-reputation-meter--${tone}`} aria-label={`Estado ${tone === 'green' ? 'verde' : tone === 'yellow' ? 'amarillo' : 'rojo'}`}><i /><i /><i /><i /><i /></span>
 }
@@ -1032,13 +888,11 @@ function monthlyConfig({ phase, title, prompt }: MonthlyFrame) {
   return next
 }
 
-export function ReputationDemoPage({ prefill = false, onOpenLibrary, monthlyFrame }: { prefill?: boolean; onOpenLibrary: () => void; monthlyFrame?: MonthlyFrame }) {
+export function ReputationDemoPage({ prefill = false, monthlyFrame }: { prefill?: boolean; monthlyFrame?: MonthlyFrame }) {
   const [restoredSession] = useState<StoredSession | null>(() => monthlyFrame ? null : readSavedSession(prefill))
   const [isMonthly] = useState(Boolean(monthlyFrame))
   const [savedConfig, setConfig] = useState<DemoConfig>(() => restoredSession?.config ?? createConfig(prefill))
   const config = monthlyFrame ? monthlyConfig(monthlyFrame) : savedConfig
-  const [savedGuidedStart, setShowGuidedStart] = useState(!prefill && !restoredSession)
-  const showGuidedStart = monthlyFrame ? false : savedGuidedStart
   const [savedStage, setBuilderStage] = useState<BuilderStage>('build')
   const builderStage: BuilderStage = monthlyFrame ? monthlyFrame.phase >= 8 ? 'mobile' : monthlyFrame.phase >= 7 ? 'template' : 'build' : savedStage
   const [savedTemplateVisited, setTemplateVisited] = useState(false)
@@ -1081,14 +935,13 @@ export function ReputationDemoPage({ prefill = false, onOpenLibrary, monthlyFram
 
   useEffect(() => {
     if (isMonthly) return
-    if (showGuidedStart) return
     writeSavedSession(config, device, prefill)
-  }, [config, device, prefill, showGuidedStart, isMonthly])
+  }, [config, device, prefill, isMonthly])
 
   useEffect(() => {
-    if (showGuidedStart || builderStage === 'build') return
+    if (builderStage === 'build') return
     window.requestAnimationFrame(() => stageHeadingRef.current?.focus())
-  }, [builderStage, showGuidedStart])
+  }, [builderStage])
 
   const cancelGeneration = () => {
     generationRequest.current += 1
@@ -1345,7 +1198,6 @@ export function ReputationDemoPage({ prefill = false, onOpenLibrary, monthlyFram
     setSelected(null)
     setBuilderStage('build')
     setTemplateVisited(false)
-    setShowGuidedStart(!prefill)
     setNotice('La demo volvió a su estado inicial.')
   }
 
@@ -1385,13 +1237,12 @@ export function ReputationDemoPage({ prefill = false, onOpenLibrary, monthlyFram
     setNotice('La misma configuración se adaptó a mobile para revisarla en contexto.')
   }
 
-  if (showGuidedStart) return <GuidedStart onOpenLibrary={onOpenLibrary} onBlank={() => { setConfig(createConfig(false)); setBuilderStage('build'); setTemplateVisited(false); setShowGuidedStart(false); setNotice('') }} onCreate={(draft) => { setConfig(draft); setBuilderStage('build'); setTemplateVisited(false); setSelected('slot-1'); setShowGuidedStart(false); setNotice('Primera propuesta lista. Puedes editar todos sus elementos.') }} />
 
   return (
     <section className="reputation-demo" aria-labelledby="reputation-demo-title">
       <header className="reputation-demo__intro">
         <div>
-          <p className="eyebrow">Builder · Demo guiada</p>
+          <p className="eyebrow">Builder · Nueva card</p>
           <h1 id="reputation-demo-title">Crea una card</h1>
           <p>Organiza la card en tres slots: información principal, información complementaria y recomendaciones contextuales.</p>
         </div>
