@@ -1,12 +1,5 @@
-import { CardStructureRules, OperationalGuideline } from './ComponentGuideline'
-
-const states = [
-  { name: 'Resumida', description: 'Muestra categoría, métrica, etiqueta y acceso; si hay detalle disponible, ofrece “Ver más”.' },
-  { name: 'Desplegada', description: 'Agrega hasta cuatro tareas con sus cantidades y cambia el control a “Ver menos”.' },
-  { name: 'Con atención', description: 'Puede sumar un dot rojo en la categoría y pills rojas en las tareas señaladas por la fuente.' },
-  { name: 'Error parcial', description: 'Reemplaza solo la subcard afectada por “No pudimos mostrar estos datos” y “Reintentar”.' },
-  { name: 'Error total', description: 'Mantiene el título del módulo y muestra un único fallback cuando no se recupera ninguna categoría.' },
-]
+import { OperationalGuideline } from './ComponentGuideline'
+import { PublicationTasksAnatomy } from './PublicationTasksAnatomy'
 
 export function PublicationTasksGuideline() {
   return (
@@ -46,29 +39,8 @@ export function PublicationTasksGuideline() {
 
         <section className="content-section" id="anatomia">
           <h2>Anatomía</h2>
-          <p className="section-intro">La estructura de la card se conserva; lo editable son sus categorías, tareas y señales de prioridad.</p>
-          <div className="publication-anatomy">
-            <div className="publication-anatomy__preview" aria-label="Ejemplo de anatomía del componente">
-              <div className="publication-anatomy__card-title"><span className="number-marker">1</span>Pendientes en tus publicaciones</div>
-              <div className="publication-anatomy__subcard">
-                <div className="publication-anatomy__header"><span><span className="number-marker">2</span>Publicaciones</span><span className="publication-anatomy__dot"><span className="number-marker">6</span></span></div>
-              <div className="publication-anatomy__metric"><span className="number-marker">3</span><strong>+999</strong><small>Por mejorar</small></div>
-              <div className="publication-anatomy__task"><span><span className="number-marker">4</span>Prioritarias para catálogo</span><span className="publication-anatomy__pill publication-anatomy__pill--quiet"><span className="number-marker">5</span>300</span></div>
-              <div className="publication-anatomy__task"><span>Sin stock</span><span className="publication-anatomy__pill">500</span></div>
-              <div className="publication-anatomy__task"><span>Próximas a pausarse</span><span className="publication-anatomy__pill publication-anatomy__pill--quiet">390</span></div>
-                <div className="publication-anatomy__footer"><span className="number-marker">7</span>Ver menos</div>
-              </div>
-            </div>
-            <ol className="anatomy-list">
-              <li><strong>Título de la card</strong><span>Identifica el conjunto de pendientes.</span></li>
-              <li><strong>Categoría</strong><span>Agrupa tareas relacionadas.</span></li>
-              <li><strong>Resumen</strong><span>Comunica la métrica agregada y su significado: por responder, mejorar, gestionar o sugerencias.</span></li>
-              <li><strong>Tarea</strong><span>Expresa una acción concreta y dirige a su resolución.</span></li>
-              <li><strong>Pill</strong><span>Muestra la cantidad asociada a una tarea.</span></li>
-              <li><strong>Dot</strong><span>Señala atención en la categoría según el estado recibido.</span></li>
-              <li><strong>Controles</strong><span>El chevron navega al dominio; “Ver más/menos” despliega o pliega las tareas.</span></li>
-            </ol>
-          </div>
+          <p className="section-intro">Cinco secciones plegadas, según el <a href="https://www.figma.com/design/uWP6X6YhgX2lzgOBwyiguO/MASTER---Ajustes?node-id=41965-303239" target="_blank" rel="noreferrer">MASTER · Ajustes</a>. La estructura se conserva; los valores y las señales de atención son ejemplos de esta instancia.</p>
+          <PublicationTasksAnatomy />
         </section>
 
         <section className="content-section" id="contenido">
@@ -95,16 +67,7 @@ export function PublicationTasksGuideline() {
           <p className="guideline-note">Usar la urgencia con criterio: si todo se marca como urgente, la señal deja de ayudar a priorizar.</p>
         </section>
 
-        <OperationalGuideline componentId="publication-tasks" />
-
-        <CardStructureRules />
-
-        <section className="content-section" id="estados">
-          <h2>Variantes y estados</h2>
-          <div className="publication-states">
-            {states.map((state) => <div className="publication-state" key={state.name}><span className="publication-state__sample" aria-hidden="true"><i /><i /><i /></span><strong>{state.name}</strong><p>{state.description}</p></div>)}
-          </div>
-        </section>
+        <OperationalGuideline componentId="publication-tasks" showResponsiveAccessibility={false} />
 
       </div>
       <aside className="detail-index" aria-label="En esta guía">
@@ -116,10 +79,7 @@ export function PublicationTasksGuideline() {
         <a href="#prioridad">Prioridad y urgencia</a>
         <a href="#logica">Lógica y condiciones</a>
         <a href="#datos-comportamiento">Datos y comportamiento</a>
-        <a href="#responsive-accesibilidad">Responsive y accesibilidad</a>
         <a href="#validacion">Checklist</a>
-        <a href="#transversales">Reglas transversales</a>
-        <a href="#estados">Variantes y estados</a>
       </aside>
     </div>
   )

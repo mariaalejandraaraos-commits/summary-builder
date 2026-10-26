@@ -1,6 +1,7 @@
 import { ImagePlus, LockKeyhole, Sparkles } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { TasksCard, type PublicationTaskGroup } from './PublicationTasksCard'
+import type { PublicationUseCaseId } from './PublicationUseCaseOptions'
 
 const noop = () => undefined
 
@@ -88,8 +89,8 @@ const onboardingSummaryGroups: PublicationTaskGroup[] = [
   },
 ]
 
-function TasksPreview({ title, groups }: { title: string; groups: PublicationTaskGroup[] }) {
-  return <TasksCard title={title} groups={groups} showTitle compact={false} shortContainer onNavigate={noop} onRetry={noop} />
+function TasksPreview({ title, groups, onNavigate = noop }: { title: string; groups: PublicationTaskGroup[]; onNavigate?: (label: string) => void }) {
+  return <TasksCard title={title} groups={groups} showTitle compact={false} shortContainer onNavigate={onNavigate} onRetry={noop} />
 }
 
 function UseCaseShowcase({ label, children, wide = false }: { label: string; children: ReactNode; wide?: boolean }) {
@@ -115,7 +116,7 @@ function UseCaseSection({ title, description, children }: { title: string; descr
   )
 }
 
-function MyPageContextCard() {
+function MyPageContextCard({ onNavigate = noop }: { onNavigate?: (label: string) => void }) {
   return (
     <article className="my-page-context-card" aria-label="Card de contexto Mi página">
       <strong>My page</strong>
@@ -124,7 +125,7 @@ function MyPageContextCard() {
         <span><b>0</b><small>New followers</small></span>
       </div>
       <p>Last 30 days</p>
-      <a href="#use-cases-top" onClick={(event) => event.preventDefault()}>Go to My page <span aria-hidden="true">›</span></a>
+      <a href="#use-cases-top" onClick={(event) => { event.preventDefault(); onNavigate('My page') }}>Go to My page <span aria-hidden="true">›</span></a>
     </article>
   )
 }
@@ -138,7 +139,7 @@ function LockedOnboardingCard() {
   )
 }
 
-function ChallengeCard({ second = false }: { second?: boolean }) {
+function ChallengeCard({ second = false, onNavigate = noop }: { second?: boolean; onNavigate?: (label: string) => void }) {
   return (
     <article className="challenge-card">
       <span className="challenge-card__badge">Listo para vender | Desafío {second ? '2' : '1'} <Sparkles aria-hidden="true" size={12} /></span>
@@ -148,12 +149,22 @@ function ChallengeCard({ second = false }: { second?: boolean }) {
         <p>{second ? 'Creá fondos realistas que destaquen tus productos.' : 'Hacelo fácil y rápido usando nuestras herramientas de IA.'}</p>
         {second && <div className="challenge-card__product"><span aria-hidden="true">📱</span><small>Xiaomi Redmi 9 4g Lte para tu publicación</small></div>}
         <div className="challenge-card__actions">
-          <button type="button">{second ? 'Usar editor' : 'Crear publicación'}</button>
-          <button className="challenge-card__help" type="button"><Sparkles aria-hidden="true" size={12} /> Quiero ayuda</button>
+          <button type="button" onClick={() => onNavigate(second ? 'Usar editor' : 'Crear publicación')}>{second ? 'Usar editor' : 'Crear publicación'}</button>
+          <button className="challenge-card__help" type="button" onClick={() => onNavigate('Quiero ayuda')}><Sparkles aria-hidden="true" size={12} /> Quiero ayuda</button>
         </div>
       </div>
     </article>
   )
+}
+
+export function PublicationUseCasePreview({ caseId, onNavigate = noop }: { caseId: PublicationUseCaseId; onNavigate?: (label: string) => void }) {
+  if (caseId === 'mlb') return <TasksPreview title="Pendências nos seus anúncios" groups={mlbGroups} onNavigate={onNavigate} />
+  if (caseId === 'cbt-basic') return <div className="use-case-paired-cards"><TasksPreview title="Pending tasks in Listings" groups={cbtBasicListings} onNavigate={onNavigate} /><TasksPreview title="Pending tasks in Orders" groups={cbtOrders} onNavigate={onNavigate} /></div>
+  if (caseId === 'cbt-m4') return <div className="use-case-context-stack"><TasksPreview title="Pending tasks in Listings" groups={cbtM4Listings} onNavigate={onNavigate} /><MyPageContextCard onNavigate={onNavigate} /></div>
+  if (caseId === 'cbt-m6') return <TasksPreview title="Pending tasks in Listings" groups={cbtM6Groups} onNavigate={onNavigate} />
+  if (caseId === 'onboarding-locked') return <LockedOnboardingCard />
+  if (caseId === 'onboarding-challenge-1') return <div className="onboarding-shell"><header><strong>Pendientes en tus publicaciones</strong></header><ChallengeCard onNavigate={onNavigate} /></div>
+  return <div className="onboarding-combined-preview"><TasksPreview title="Pendientes en tus publicaciones" groups={onboardingSummaryGroups} onNavigate={onNavigate} /><ChallengeCard second onNavigate={onNavigate} /></div>
 }
 
 export function PublicationTasksUseCases() {
@@ -170,46 +181,34 @@ export function PublicationTasksUseCases() {
 
       <UseCaseSection title="MLB" description="Versión localizada para Brasil, con contenido y métricas en portugués.">
         <UseCaseShowcase label="MLB · Venta local · Portugués">
-          <TasksPreview title="Pendências nos seus anúncios" groups={mlbGroups} />
+          <PublicationUseCasePreview caseId="mlb" />
         </UseCaseShowcase>
       </UseCaseSection>
 
       <UseCaseSection title="CBT · T1, T3 y T6" description="Composición compacta que separa los pendientes de publicaciones y pedidos.">
         <UseCaseShowcase label="CBT · T1, T3 y T6 · Listings + Orders" wide>
-          <div className="use-case-paired-cards">
-            <TasksPreview title="Pending tasks in Listings" groups={cbtBasicListings} />
-            <TasksPreview title="Pending tasks in Orders" groups={cbtOrders} />
-          </div>
+          <PublicationUseCasePreview caseId="cbt-basic" />
         </UseCaseShowcase>
       </UseCaseSection>
 
       <UseCaseSection title="CBT · M4 y M6" description="Dos densidades de información: contexto de Summary y categorías desplegadas.">
         <UseCaseShowcase label="CBT · M4 · Pendientes dentro del Summary" wide>
-          <div className="use-case-context-stack">
-            <TasksPreview title="Pending tasks in Listings" groups={cbtM4Listings} />
-            <MyPageContextCard />
-          </div>
+          <PublicationUseCasePreview caseId="cbt-m4" />
         </UseCaseShowcase>
         <UseCaseShowcase label="CBT · M6 · Categorías con detalle">
-          <TasksPreview title="Pending tasks in Listings" groups={cbtM6Groups} />
+          <PublicationUseCasePreview caseId="cbt-m6" />
         </UseCaseShowcase>
       </UseCaseSection>
 
       <UseCaseSection title="Onboarding" description="Estados que acompañan la activación: acceso bloqueado, primer desafío y recomendación contextual.">
         <UseCaseShowcase label="Onboarding · Acceso bloqueado">
-          <LockedOnboardingCard />
+          <PublicationUseCasePreview caseId="onboarding-locked" />
         </UseCaseShowcase>
         <UseCaseShowcase label="Onboarding · Desafío 1">
-          <div className="onboarding-shell">
-            <header><strong>Pendientes en tus publicaciones</strong></header>
-            <ChallengeCard />
-          </div>
+          <PublicationUseCasePreview caseId="onboarding-challenge-1" />
         </UseCaseShowcase>
         <UseCaseShowcase label="Onboarding · Desafío 2 dentro del Summary" wide>
-          <div className="onboarding-combined-preview">
-            <TasksPreview title="Pendientes en tus publicaciones" groups={onboardingSummaryGroups} />
-            <ChallengeCard second />
-          </div>
+          <PublicationUseCasePreview caseId="onboarding-challenge-2" />
         </UseCaseShowcase>
       </UseCaseSection>
     </div>

@@ -205,12 +205,12 @@ const operationalGuidelines: Record<string, OperationalGuidelineDefinition> = {
   'publication-tasks': {
     conditions: [
       { when: 'La categoría está resumida.', outcome: 'Mostrar nombre, dot si corresponde, chevron, métrica y etiqueta; ocultar el listado de tareas.' },
-      { when: 'La categoría tiene detalle disponible.', outcome: 'Mostrar “Ver más”; al activarlo, exponer hasta cuatro tareas y cambiar el control a “Ver menos”.' },
+      { when: 'La categoría tiene detalle disponible.', outcome: 'Mostrar “Ver más”; al activarlo, desplegar en esa subcard hasta cuatro tareas de la categoría y cambiar el control a “Ver menos”, sin expandir las otras categorías.' },
       { when: 'Falla una sola categoría.', outcome: 'Mostrar “No pudimos mostrar estos datos” y “Reintentar” dentro de esa subcard sin bloquear las demás.' },
       { when: 'No se recupera ninguna categoría.', outcome: 'Conservar el título del módulo y reemplazar el contenido por un único fallback con reintento.' },
     ],
     data: ['La métrica agregada y su etiqueta llegan juntas; no se recalculan sumando las pills visibles.', 'Mostrar como máximo cuatro tareas por categoría en la variante desplegada.', 'Conservar el orden documentado: Preguntas, Publicaciones, Productos Full, Precios y Publicidad.', 'Dot y pills expresan los estados recibidos; no asignar color manualmente ni asumir que siempre coinciden.'],
-    behavior: ['El chevron conduce al destino general de la categoría; cada tarea navega a su resolución cuando tiene evento.', '“Ver más” despliega el listado dentro de la subcard y “Ver menos” vuelve al resumen.', 'Solo una falla completa reemplaza todo el contenido del módulo.', 'Reintentar una falla parcial actualiza la categoría afectada sin borrar las restantes.'],
+    behavior: ['El chevron conduce al destino general de la categoría; cada tarea navega a su resolución cuando tiene evento.', '“Ver más” despliega en línea el detalle de tareas de esa categoría dentro de su subcard; cada categoría se expande de forma independiente y “Ver menos” vuelve al resumen.', 'Solo una falla completa reemplaza todo el contenido del módulo.', 'Reintentar una falla parcial actualiza la categoría afectada sin borrar las restantes.'],
     responsive: ['El HO validado cubre Desktop; no derivar de él una composición mobile.', 'En Desktop, conservar el ancho y el orden de las subcards dentro de la columna.', 'Si se define una versión mobile, debe preservar categoría, métrica, estado y acción sin depender de hover.'],
     accessibility: ['Anunciar nombre de la categoría, métrica y estado de atención sin depender del color.', 'Cada pill combina la tarea con su cantidad en el orden de lectura.', '“Ver más/menos” expone su estado mediante `aria-expanded` y referencia el contenido controlado.', 'Después de reintentar, comunicar el resultado sin mover el foco inesperadamente.'],
     validation: ['El orden de las cinco categorías coincide con el HO.', 'No hay más de cuatro tareas visibles por categoría.', 'Resumen y detalle usan la misma métrica recibida.', 'Se prueban error parcial, error total y reintento con los textos documentados.'],
@@ -218,12 +218,12 @@ const operationalGuidelines: Record<string, OperationalGuidelineDefinition> = {
   'sales-tasks': {
     conditions: [
       { when: 'El módulo carga correctamente.', outcome: 'Mostrar Envíos de hoy antes de Posventa, cada uno con métrica, etiqueta y navegación propias.' },
-      { when: 'Una categoría tiene detalle disponible.', outcome: 'Mostrar “Ver más”; al activarlo, desplegar sus tareas y cambiar el control a “Ver menos”.' },
+      { when: 'Una categoría tiene detalle disponible.', outcome: 'Mostrar “Ver más”; al activarlo, desplegar en esa subcard el detalle de sus tareas y cambiar el control a “Ver menos”, sin expandir las otras categorías.' },
       { when: 'Falla Envíos de hoy o Posventa.', outcome: 'Mostrar el fallback únicamente en la categoría afectada y conservar la otra operativa.' },
       { when: 'Fallan ambas categorías.', outcome: 'Mantener “Pendientes en tus ventas” y mostrar un único fallback con “Reintentar”.' },
     ],
     data: ['Las categorías documentadas son Envíos de hoy y Posventa, en ese orden.', 'Métrica, etiqueta, dot y pills provienen de la fuente; no se recalculan en la card.', 'Envíos de hoy reúne Demorados y modalidades como Colecta, Turbo o Agencia con su ventana horaria.', 'Posventa reúne Reclamos y mediaciones, Devoluciones y Mensajes no leídos.'],
-    behavior: ['Cada categoría se despliega, navega y falla de manera independiente.', 'El chevron abre el dominio de la categoría y las tareas dirigen a su resolución cuando tienen evento.', 'El color del dot y el de las pills no se derivan uno del otro.', 'Reintentar una categoría no debe alterar el estado de la otra.'],
+    behavior: ['Cada categoría se despliega, navega y falla de manera independiente.', '“Ver más” abre en línea el detalle de tareas de esa categoría dentro de su subcard; “Ver menos” lo vuelve a plegar.', 'El chevron abre el dominio de la categoría y las tareas dirigen a su resolución cuando tienen evento.', 'El color del dot y el de las pills no se derivan uno del otro.', 'Reintentar una categoría no debe alterar el estado de la otra.'],
     responsive: ['El HO validado cubre Desktop; la composición mobile requiere una referencia específica.', 'En cualquier adaptación futura, conservar Envíos de hoy antes de Posventa.', 'Modalidad y ventana horaria forman una sola unidad y no deben separarse ni truncarse de forma ambigua.'],
     accessibility: ['Anunciar categoría, métrica, tarea y cantidad sin depender del color.', 'Leer modalidad y ventana horaria como una misma tarea.', '“Ver más/menos” es operable con teclado y expone `aria-expanded`.', 'El resultado del reintento se comunica sin perder el foco.'],
     validation: ['Envíos de hoy aparece antes de Posventa.', 'La etiqueta es “Por despachar” para Envíos de hoy y “Por atender” para Posventa en los ejemplos documentados.', 'Se prueban error parcial y error total con reintento.', 'Todas las ventanas horarias se leen completas en Desktop.'],
@@ -412,7 +412,7 @@ const operationalGuidelines: Record<string, OperationalGuidelineDefinition> = {
   },
 }
 
-export function OperationalGuideline({ componentId }: { componentId: string }) {
+export function OperationalGuideline({ componentId, showResponsiveAccessibility = true }: { componentId: string; showResponsiveAccessibility?: boolean }) {
   const operational = operationalGuidelines[componentId]
   if (!operational) return null
 
@@ -434,13 +434,13 @@ export function OperationalGuideline({ componentId }: { componentId: string }) {
       </div>
     </section>
 
-    <section className="content-section" id="responsive-accesibilidad">
+    {showResponsiveAccessibility && <section className="content-section" id="responsive-accesibilidad">
       <h2>Responsive y accesibilidad</h2>
       <div className="guideline-operational-grid">
         <div><span className="guideline-label">Responsive</span><ul>{operational.responsive.map((rule) => <li key={rule}>{rule}</li>)}</ul></div>
         <div><span className="guideline-label">Accesibilidad</span><ul>{operational.accessibility.map((rule) => <li key={rule}>{rule}</li>)}</ul></div>
       </div>
-    </section>
+    </section>}
 
     <section className="content-section" id="validacion">
       <h2>Checklist de validación</h2>

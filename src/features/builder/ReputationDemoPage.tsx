@@ -25,6 +25,7 @@ import fontRegular from '../../assets/fonts/proximanova-regular.woff2?inline'
 import fontSemibold from '../../assets/fonts/proximanova-semibold.woff2?inline'
 import fontBold from '../../assets/fonts/proximanova-bold.woff2?inline'
 import demoStyles from './reputation-demo.css?raw'
+import templateStyles from './summary-template.css?raw'
 import appStyles from '../../App.css?raw'
 import { downloadContextHtml } from './exportCardHtml'
 import { SummaryTemplatePreview } from './SummaryTemplatePreview'
@@ -1206,7 +1207,7 @@ export function ReputationDemoPage({ prefill = false, monthlyFrame }: { prefill?
       setNotice('Completa las validaciones pendientes antes de descargar la revisión.')
       return
     }
-    const exported = downloadContextHtml({ context: contextExportRef.current, title: config.title, styles: `${contextStyles}\n${demoStyles}` })
+    const exported = downloadContextHtml({ context: contextExportRef.current, title: config.title, styles: `${contextStyles}\n${demoStyles}\n${templateStyles}` })
     setNotice(exported ? 'Se descargó un HTML con el Template desktop y su adaptación mobile.' : 'No se pudo preparar el HTML. Intenta de nuevo.')
   }
 

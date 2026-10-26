@@ -36,6 +36,10 @@ type TasksCardProps = {
   shortContainer?: boolean
   onNavigate: (label: string) => void
   onRetry: (groupId: string) => void
+  expandedGroupIds?: ReadonlySet<string>
+  onToggleGroup?: (groupId: string) => void
+  focusedGroupId?: string
+  onFocusGroup?: (groupId: string) => void
 }
 
 export function TasksCard({
@@ -46,11 +50,20 @@ export function TasksCard({
   shortContainer = false,
   onNavigate,
   onRetry,
+  expandedGroupIds,
+  onToggleGroup,
+  focusedGroupId,
+  onFocusGroup,
 }: TasksCardProps) {
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => new Set(groups.filter((group) => group.defaultExpanded).map((group) => group.id)))
+  const [internalExpandedGroups, setInternalExpandedGroups] = useState<Set<string>>(() => new Set(groups.filter((group) => group.defaultExpanded).map((group) => group.id)))
+  const expandedGroups = expandedGroupIds ?? internalExpandedGroups
 
   const toggleGroup = (groupId: string) => {
-    setExpandedGroups((current) => {
+    if (onToggleGroup) {
+      onToggleGroup(groupId)
+      return
+    }
+    setInternalExpandedGroups((current) => {
       const next = new Set(current)
       if (next.has(groupId)) next.delete(groupId)
       else next.add(groupId)
@@ -59,7 +72,7 @@ export function TasksCard({
   }
 
   return (
-    <article className={`publication-tasks-card ${compact ? 'publication-tasks-card--compact' : ''} ${shortContainer ? 'publication-tasks-card--short' : ''}`} aria-label={title}>
+    <article className={`publication-tasks-card ${compact ? 'publication-tasks-card--compact' : ''} ${shortContainer ? 'publication-tasks-card--short' : ''} ${focusedGroupId ? 'publication-tasks-card--focus-preview' : ''}`} aria-label={title}>
       {showTitle && <h3 className="publication-tasks-card__title">{title || 'Sin título'}</h3>}
       <div className="publication-tasks-card__list">
         {groups.map((group) => {
@@ -89,7 +102,7 @@ export function TasksCard({
           )
 
           return (
-            <section className="task-subcard" key={group.id}>
+            <section className={`task-subcard ${focusedGroupId === group.id ? 'task-subcard--selected' : ''}`} key={group.id} onClickCapture={() => onFocusGroup?.(group.id)} onFocusCapture={() => onFocusGroup?.(group.id)}>
               {group.hasNavigation && !group.fallback ? (
                 <button className="task-subcard__header" type="button" onClick={() => onNavigate(group.title)} aria-label={`Abrir ${group.title}`}>
                   {headerContent}
