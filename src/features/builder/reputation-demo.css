@@ -37,7 +37,7 @@
 .reputation-demo__device-options label:has(input:focus-visible) { outline: 2px solid var(--sa-color-border-focus); outline-offset: 2px; }
 .reputation-demo__stage { flex: 1; display: grid; place-items: start center; overflow: auto; padding: 64px 18px 28px; border: 1px solid var(--sa-color-border-subtle); background-color: #f1f2f4; background-image: radial-gradient(circle, #b8bec8 1.1px, transparent 1.2px); background-size: 17px 17px; border-radius: var(--sa-radius-preview); }
 .reputation-demo__card { width: 270px; overflow: hidden; color: #191919; background: #fff; border: 1px solid #d7d7d7; border-radius: 6px; box-shadow: 0 2px 5px rgb(0 0 0 / 14%); }
-.reputation-demo__stage[data-device='mobile'] .reputation-demo__card { width: min(340px, 100%); }
+.reputation-demo__stage[data-device='mobile'] .reputation-demo__card { width: min(320px, 100%); }
 .reputation-demo__card-header { height: 51px; display: flex; align-items: center; padding: 0 16px; border-bottom: 1px solid #e6e6e6; }
 .reputation-demo__card-header input { width: 100%; min-width: 0; padding: 3px 0; border: 0; color: #191919; background: transparent; font-size: 14px; font-weight: 600; }
 .reputation-demo__card-header input::placeholder { color: #191919; opacity: 1; }
@@ -413,7 +413,7 @@
 .builder-review__checklist li.is-pending > span { color: #392b19; background: #f1bc61; }
 .sa-theme .mobile-context .reputation-demo__card-header strong { color: #191919; }
 .mobile-context { display: grid; place-items: center; min-height: 650px; padding: 26px; border: 1px solid var(--sa-color-border-subtle); background: var(--sa-color-surface-subtle); border-radius: var(--sa-radius-panel); }
-.mobile-context__device { width: min(100%, 352px); min-height: 596px; overflow: hidden; border: 8px solid #1f2530; color: #282834; background: #f5f6f7; border-radius: 32px; box-shadow: 0 12px 30px rgb(0 0 0 / 24%); }
+.mobile-context__device { width: min(100%, 368px); min-height: 596px; overflow: hidden; border: 8px solid #1f2530; color: #282834; background: #f5f6f7; border-radius: 32px; box-shadow: 0 12px 30px rgb(0 0 0 / 24%); }
 .mobile-context__status { height: 27px; display: flex; align-items: center; justify-content: space-between; padding: 0 17px; background: #fff; font-size: 10px; font-weight: 700; }
 .mobile-context__status i { width: 58px; height: 14px; margin-left: 16px; background: #1f2530; border-radius: 10px; }
 .mobile-context__topbar { height: 47px; display: flex; align-items: center; justify-content: space-between; padding: 0 17px; border-top: 1px solid #edf0f2; background: #fff; font-size: 14px; }
@@ -422,7 +422,7 @@
 .mobile-context__neighbor { display: grid; gap: 3px; padding: 13px; border: 1px solid #e1e4e8; background: #fff; border-radius: 8px; }
 .mobile-context__neighbor strong { font-size: 13px; }
 .mobile-context__neighbor span { color: #5e6672; font-size: 12px; }
-.mobile-context .reputation-demo__context-card { width: 100%; }
+.mobile-context .reputation-demo__context-card { width: min(320px, 100%); justify-self: center; }
 .builder-final-review { display: grid; gap: 16px; margin-top: 8px; padding: 20px; border: 1px solid var(--sa-color-border-subtle); background: var(--sa-color-surface); border-radius: var(--sa-radius-panel); }
 .builder-final-review > header p { margin: 0 0 4px; color: var(--sa-color-text-muted); font-size: 11px; }
 .builder-final-review > header h3 { margin: 0; color: var(--sa-color-text); font-size: 17px; }

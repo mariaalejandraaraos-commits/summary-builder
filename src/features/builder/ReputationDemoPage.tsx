@@ -35,6 +35,8 @@ import { MonthlyGeneration } from '../../monthly-generation'
 import type { BuilderElementKind } from '../../domain/mobile-sections'
 import { BuilderElementSelector } from './BuilderElementSelector'
 import { MobileSectionBuilder } from './MobileSectionBuilder'
+import { MobileCardBuilder, MobileCardSelector } from './MobileCardBuilder'
+import { mobileCardsStorageKey, readMobileCardsSession, type MobileCardsSession, type MobileCardSelection } from '../../domain/mobile-cards'
 import type { MobileFreeSlotBuilderProps } from './mobile-free-slot'
 import './reputation-demo.css'
 
@@ -922,6 +924,17 @@ export function ReputationDemoPage({ prefill = false, monthlyFrame, slotOnly }: 
   const templateVisited = monthlyFrame ? monthlyFrame.phase >= 7 : savedTemplateVisited
   const [device, setDevice] = useState<'desktop' | 'mobile'>(() => slotOnly ? 'mobile' : restoredSession?.device ?? 'desktop')
   const [elementKind, setElementKind] = useState<BuilderElementKind>(() => restoredSession?.elementKind ?? 'card')
+  const [mobileCards, setMobileCards] = useState(readMobileCardsSession)
+  const [mobileCardsSaveFailed, setMobileCardsSaveFailed] = useState(false)
+  const updateMobileCards = (next: MobileCardsSession) => {
+    setMobileCards(next)
+    try { window.localStorage.setItem(mobileCardsStorageKey, JSON.stringify(next)); setMobileCardsSaveFailed(false) }
+    catch { setMobileCardsSaveFailed(true) }
+  }
+  const selectMobileCard = (kind: MobileCardSelection) => {
+    updateMobileCards({ ...mobileCards, kind })
+    window.requestAnimationFrame(() => document.getElementById('mobile-card-kind')?.focus())
+  }
   const sessionStatus = restoredSession ? 'Sesión restaurada · guardado local' : 'Guardado local en este navegador'
   const [savedSelected, setSelected] = useState<SlotId | 'title' | 'footer' | null>(null)
   const selected = slotOnly ? 'slot-1' : monthlyFrame ? monthlyFrame.phase < 1 ? null : monthlyFrame.phase === 1 ? 'title' : monthlyFrame.phase <= 3 ? 'slot-1' : 'slot-2' : savedSelected
@@ -1350,6 +1363,14 @@ export function ReputationDemoPage({ prefill = false, monthlyFrame, slotOnly }: 
     }} exportStyles={`${contextStyles}\n${demoStyles}`} freeSlotBuilder={MobileFreeSlotBuilder} />
   }
 
+  if (device === 'mobile' && mobileCards.kind !== 'free' && !monthlyFrame) {
+    const kind = mobileCards.kind
+    return <MobileCardBuilder kind={kind} draft={mobileCards.drafts[kind]} onSelect={selectMobileCard} onChange={(draft) => updateMobileCards({ ...mobileCards, drafts: { ...mobileCards.drafts, [kind]: draft } })} onElementChange={changeElementKind} onDesktop={() => {
+      setDevice('desktop')
+      window.requestAnimationFrame(() => document.querySelector<HTMLInputElement>('input[name="reputation-demo-device"]:checked')?.focus())
+    }} exportStyles={contextStyles} saveFailed={mobileCardsSaveFailed} />
+  }
+
   return (
     <section className="reputation-demo" aria-labelledby="reputation-demo-title">
       <header className="reputation-demo__intro">
@@ -1376,7 +1397,7 @@ export function ReputationDemoPage({ prefill = false, monthlyFrame, slotOnly }: 
       {builderStage === 'build' ? <>
       <div className="reputation-demo__layout">
         <aside className="reputation-demo__panel reputation-demo__palette" aria-labelledby="reputation-demo-slots-title">
-          {device === 'mobile' && !monthlyFrame && <BuilderElementSelector value="card" onChange={changeElementKind} />}
+          {device === 'mobile' && !monthlyFrame && <><BuilderElementSelector value="card" onChange={changeElementKind} /><MobileCardSelector value="free" onChange={selectMobileCard} /></>}
           <div className="reputation-demo__panel-heading"><p className="eyebrow">1. Construye la card</p><h2 id="reputation-demo-slots-title">Slots configurados · {config.order.filter((id) => config.slots[id].enabled).length} de {config.order.length || 3}</h2><p>{config.order.length === 0 ? 'Agrega el primer slot para definir la estructura de la card.' : 'Los slots disponibles no cuentan como contenido hasta que los completes.'}</p></div>
           <ol className="reputation-demo__slot-list">
             {config.order.map((id) => {
@@ -1420,7 +1441,7 @@ export function ReputationDemoPage({ prefill = false, monthlyFrame, slotOnly }: 
               {(hasPreviewContent || monthlyFrame) && <button type="button" className={`reputation-demo__card-footer${selected === 'footer' ? ' is-selected' : ''}`} onClick={() => setSelected('footer')} aria-label={config.footer || 'Configurar la acción de la card'}><span>{config.footer || 'Agregar acción'}</span><span aria-hidden="true">›</span></button>}
             </article>
           </div>
-          <p className="reputation-demo__canvas-hint">Card {device === 'mobile' ? 'Mobile: 340 px' : 'Desktop: 270 px'} · Máximo tres slots. Pasa el cursor por uno para eliminarlo.</p>
+          <p className="reputation-demo__canvas-hint">Card {device === 'mobile' ? 'Mobile: 320 px' : 'Desktop: 270 px'} · Máximo tres slots. Pasa el cursor por uno para eliminarlo.</p>
         </section>
 
         <aside className="reputation-demo__panel reputation-demo__inspector" aria-labelledby="reputation-demo-properties-title">
