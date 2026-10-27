@@ -25,12 +25,19 @@ import fontRegular from '../../assets/fonts/proximanova-regular.woff2?inline'
 import fontSemibold from '../../assets/fonts/proximanova-semibold.woff2?inline'
 import fontBold from '../../assets/fonts/proximanova-bold.woff2?inline'
 import demoStyles from './reputation-demo.css?raw'
+import templateStyles from './summary-template.css?raw'
 import appStyles from '../../App.css?raw'
 import { downloadContextHtml } from './exportCardHtml'
 import { SummaryTemplatePreview } from './SummaryTemplatePreview'
 import { placementLabel, suggestTemplatePlacement, templateColumns, type TemplatePlacement } from './summary-template-layout'
 import { monthlyPrompt, type MonthlyFrame } from '../../monthly-sequence'
 import { MonthlyGeneration } from '../../monthly-generation'
+import type { BuilderElementKind } from '../../domain/mobile-sections'
+import { BuilderElementSelector } from './BuilderElementSelector'
+import { MobileSectionBuilder } from './MobileSectionBuilder'
+import { MobileCardBuilder, MobileCardSelector } from './MobileCardBuilder'
+import { mobileCardsStorageKey, readMobileCardsSession, type MobileCardsSession, type MobileCardSelection } from '../../domain/mobile-cards'
+import type { MobileFreeSlotBuilderProps } from './mobile-free-slot'
 import './reputation-demo.css'
 
 const contextStyles = appStyles
@@ -266,11 +273,11 @@ function andesPatternForSketch(kind: SketchKind): PromptPattern {
   return 'value'
 }
 
-type StoredSession = { version: 1 | 2 | 3 | 4; savedAt: string; config: DemoConfig; device: 'desktop' | 'mobile' }
+type StoredSession = { version: 1 | 2 | 3 | 4; savedAt: string; config: DemoConfig; device: 'desktop' | 'mobile'; elementKind?: BuilderElementKind }
 
-function readSavedSession(prefill: boolean): StoredSession | null {
+function readSavedSession(prefill: boolean, embedded?: { config: unknown }): StoredSession | null {
   try {
-    const raw = window.localStorage.getItem(prefill ? `${sessionStorageKey}-library` : sessionStorageKey)
+    const raw = embedded ? JSON.stringify({ version: 4, ...embedded }) : window.localStorage.getItem(prefill ? `${sessionStorageKey}-library` : sessionStorageKey)
     if (!raw) return null
     const stored = JSON.parse(raw) as StoredSession
     if ((stored.version !== 1 && stored.version !== 2 && stored.version !== 3 && stored.version !== 4) || !stored.config || !stored.config.slots) return null
@@ -320,15 +327,16 @@ function readSavedSession(prefill: boolean): StoredSession | null {
           : Boolean(stored.config.placementCustomized),
       },
       device: stored.device === 'mobile' ? 'mobile' : 'desktop',
+      elementKind: stored.elementKind === 'mobile-section' ? 'mobile-section' : 'card',
     }
   } catch {
     return null
   }
 }
 
-function writeSavedSession(config: DemoConfig, device: 'desktop' | 'mobile', prefill: boolean) {
+function writeSavedSession(config: DemoConfig, device: 'desktop' | 'mobile', prefill: boolean, elementKind: BuilderElementKind) {
   try {
-    const session: StoredSession = { version: 4, savedAt: new Date().toISOString(), config, device }
+    const session: StoredSession = { version: 4, savedAt: new Date().toISOString(), config, device, elementKind }
     window.localStorage.setItem(prefill ? `${sessionStorageKey}-library` : sessionStorageKey, JSON.stringify(session))
     return true
   } catch {
@@ -888,19 +896,48 @@ function monthlyConfig({ phase, title, prompt }: MonthlyFrame) {
   return next
 }
 
-export function ReputationDemoPage({ prefill = false, monthlyFrame }: { prefill?: boolean; monthlyFrame?: MonthlyFrame }) {
-  const [restoredSession] = useState<StoredSession | null>(() => monthlyFrame ? null : readSavedSession(prefill))
+function createFreeSlotConfig(draft: unknown): DemoConfig {
+  const config = draft && typeof draft === 'object' ? readSavedSession(false, { config: draft })?.config ?? createConfig(false) : createConfig(false)
+  const ideaPrompt = draft && typeof draft === 'object' && 'ideaPrompt' in draft && typeof draft.ideaPrompt === 'string' ? draft.ideaPrompt : ''
+  const slot = config.slots['slot-1']
+  // Retain existing library content as an editable saved pattern in Mi idea.
+  // Empty mobile slots start in Figma instead of inserting a default pattern.
+  const mobileSlot: DemoSlot = slot.source === 'library'
+    ? slot.enabled ? { ...slot, source: 'prompt', usesLibraryVariant: true, promptApplied: true } : { ...slot, source: 'figma' }
+    : slot
+  return { ...config, order: ['slot-1'], ideaPrompt, slots: { ...config.slots, 'slot-1': mobileSlot } }
+}
+
+function MobileFreeSlotBuilder(props: MobileFreeSlotBuilderProps) {
+  return <ReputationDemoPage slotOnly={props} />
+}
+
+export function ReputationDemoPage({ prefill = false, monthlyFrame, slotOnly }: { prefill?: boolean; monthlyFrame?: MonthlyFrame; slotOnly?: MobileFreeSlotBuilderProps }) {
+  const isSlotOnly = Boolean(slotOnly)
+  const [restoredSession] = useState<StoredSession | null>(() => monthlyFrame || slotOnly ? null : readSavedSession(prefill))
   const [isMonthly] = useState(Boolean(monthlyFrame))
-  const [savedConfig, setConfig] = useState<DemoConfig>(() => restoredSession?.config ?? createConfig(prefill))
+  const [savedConfig, setConfig] = useState<DemoConfig>(() => slotOnly ? createFreeSlotConfig(slotOnly.draft) : restoredSession?.config ?? createConfig(prefill))
   const config = monthlyFrame ? monthlyConfig(monthlyFrame) : savedConfig
   const [savedStage, setBuilderStage] = useState<BuilderStage>('build')
   const builderStage: BuilderStage = monthlyFrame ? monthlyFrame.phase >= 8 ? 'mobile' : monthlyFrame.phase >= 7 ? 'template' : 'build' : savedStage
   const [savedTemplateVisited, setTemplateVisited] = useState(false)
   const templateVisited = monthlyFrame ? monthlyFrame.phase >= 7 : savedTemplateVisited
-  const [device, setDevice] = useState<'desktop' | 'mobile'>(() => restoredSession?.device ?? 'desktop')
+  const [device, setDevice] = useState<'desktop' | 'mobile'>(() => slotOnly ? 'mobile' : restoredSession?.device ?? 'desktop')
+  const [elementKind, setElementKind] = useState<BuilderElementKind>(() => restoredSession?.elementKind ?? 'card')
+  const [mobileCards, setMobileCards] = useState(readMobileCardsSession)
+  const [mobileCardsSaveFailed, setMobileCardsSaveFailed] = useState(false)
+  const updateMobileCards = (next: MobileCardsSession) => {
+    setMobileCards(next)
+    try { window.localStorage.setItem(mobileCardsStorageKey, JSON.stringify(next)); setMobileCardsSaveFailed(false) }
+    catch { setMobileCardsSaveFailed(true) }
+  }
+  const selectMobileCard = (kind: MobileCardSelection) => {
+    updateMobileCards({ ...mobileCards, kind })
+    window.requestAnimationFrame(() => document.getElementById('mobile-card-kind')?.focus())
+  }
   const sessionStatus = restoredSession ? 'Sesión restaurada · guardado local' : 'Guardado local en este navegador'
   const [savedSelected, setSelected] = useState<SlotId | 'title' | 'footer' | null>(null)
-  const selected = monthlyFrame ? monthlyFrame.phase < 1 ? null : monthlyFrame.phase === 1 ? 'title' : monthlyFrame.phase <= 3 ? 'slot-1' : 'slot-2' : savedSelected
+  const selected = slotOnly ? 'slot-1' : monthlyFrame ? monthlyFrame.phase < 1 ? null : monthlyFrame.phase === 1 ? 'title' : monthlyFrame.phase <= 3 ? 'slot-1' : 'slot-2' : savedSelected
   const [dragOver, setDragOver] = useState<SlotId | null>(null)
   const [notice, setNotice] = useState('')
   const [figmaImportingSlot, setFigmaImportingSlot] = useState<SlotId | null>(null)
@@ -919,6 +956,9 @@ export function ReputationDemoPage({ prefill = false, monthlyFrame }: { prefill?
   const ideaPromptRef = useRef<HTMLTextAreaElement | null>(null)
   const stageHeadingRef = useRef<HTMLHeadingElement | null>(null)
   const contextExportRef = useRef<HTMLDivElement | null>(null)
+  const slotChangeRef = useRef(slotOnly?.onChange)
+
+  useEffect(() => { slotChangeRef.current = slotOnly?.onChange }, [slotOnly?.onChange])
 
   useEffect(() => () => { generationTimers.current.forEach(window.clearTimeout) }, [])
 
@@ -935,8 +975,12 @@ export function ReputationDemoPage({ prefill = false, monthlyFrame }: { prefill?
 
   useEffect(() => {
     if (isMonthly) return
-    writeSavedSession(config, device, prefill)
-  }, [config, device, prefill, isMonthly])
+    if (isSlotOnly) {
+      slotChangeRef.current?.(config)
+      return
+    }
+    writeSavedSession(config, device, prefill, elementKind)
+  }, [config, device, prefill, isMonthly, elementKind, isSlotOnly])
 
   useEffect(() => {
     if (builderStage === 'build') return
@@ -952,7 +996,7 @@ export function ReputationDemoPage({ prefill = false, monthlyFrame }: { prefill?
   }
 
   const updateSlot = (id: SlotId, patch: Partial<DemoSlot>) => {
-    setConfig((current) => ({ ...current, slots: { ...current.slots, [id]: { ...current.slots[id], ...patch } } }))
+    setConfig((current) => ({ ...current, slots: { ...current.slots, [id]: { ...current.slots[id], ...(slotOnly && current.slots[id].source === 'library' ? { enabled: true } : {}), ...patch } } }))
   }
 
   const updateMetric = (id: SlotId, index: number, patch: Partial<Metric>) => {
@@ -962,6 +1006,7 @@ export function ReputationDemoPage({ prefill = false, monthlyFrame }: { prefill?
         ...current.slots,
         [id]: {
           ...current.slots[id],
+          ...(slotOnly ? { enabled: true } : {}),
           metrics: current.slots[id].metrics.map((metric, metricIndex) => {
             if (metricIndex !== index) return metric
             const updated = { ...metric, ...patch }
@@ -984,6 +1029,7 @@ export function ReputationDemoPage({ prefill = false, monthlyFrame }: { prefill?
           ...current.slots,
           [id]: {
             ...slot,
+            ...(slotOnly ? { enabled: true } : {}),
             columns,
             metrics,
             value: columns === 1 ? metrics[0].value : slot.value,
@@ -1033,7 +1079,7 @@ export function ReputationDemoPage({ prefill = false, monthlyFrame }: { prefill?
   const changeSource = (id: SlotId, source: SlotSource) => {
     cancelGeneration()
     ideaAlternativeIndex.current = 0
-    setConfig((current) => ({ ...current, ideaPrompt: source === 'prompt' && current.slots[id].source !== 'prompt' ? '' : current.ideaPrompt, slots: { ...current.slots, [id]: { ...current.slots[id], source, enabled: source !== 'figma' } } }))
+    setConfig((current) => ({ ...current, ideaPrompt: !isSlotOnly && source === 'prompt' && current.slots[id].source !== 'prompt' ? '' : current.ideaPrompt, slots: { ...current.slots, [id]: { ...current.slots[id], source, enabled: source !== 'figma' || (isSlotOnly && Boolean(current.slots[id].figmaImageDataUrl)) } } }))
     setFigmaImportError('')
     setFigmaNeedsConnection(false)
     setFigmaDemoFile(null)
@@ -1162,7 +1208,9 @@ export function ReputationDemoPage({ prefill = false, monthlyFrame }: { prefill?
         if (generationRequest.current !== requestId) return
         setConfig((current) => {
           if (current.ideaPrompt.trim() !== prompt) return current
-          return { ...result.config, placement: placementSuggestion(result.config).placement, placementCustomized: false }
+          return slotOnly
+            ? { ...current, ideaPrompt: prompt, order: ['slot-1'], slots: { ...current.slots, 'slot-1': result.config.slots['slot-1'] } }
+            : { ...result.config, placement: placementSuggestion(result.config).placement, placementCustomized: false }
         })
         setGeneratingSlot(null)
         setGeneratingAlternative(false)
@@ -1206,7 +1254,7 @@ export function ReputationDemoPage({ prefill = false, monthlyFrame }: { prefill?
       setNotice('Completa las validaciones pendientes antes de descargar la revisión.')
       return
     }
-    const exported = downloadContextHtml({ context: contextExportRef.current, title: config.title, styles: `${contextStyles}\n${demoStyles}` })
+    const exported = downloadContextHtml({ context: contextExportRef.current, title: config.title, styles: `${contextStyles}\n${demoStyles}\n${templateStyles}` })
     setNotice(exported ? 'Se descargó un HTML con el Template desktop y su adaptación mobile.' : 'No se pudo preparar el HTML. Intenta de nuevo.')
   }
 
@@ -1236,7 +1284,92 @@ export function ReputationDemoPage({ prefill = false, monthlyFrame }: { prefill?
     setBuilderStage('mobile')
     setNotice('La misma configuración se adaptó a mobile para revisarla en contexto.')
   }
+  const changeElementKind = (nextKind: BuilderElementKind) => {
+    setElementKind(nextKind)
+    window.requestAnimationFrame(() => document.querySelector<HTMLInputElement>('input[name="builder-element-kind"]:checked')?.focus())
+  }
 
+  const slotEditor = selectedSlot ? <div className="reputation-demo__fields">
+            <fieldset className="reputation-demo__source-fields"><legend>¿Cómo quieres completar este slot?</legend><div className="reputation-demo__source-options">{!slotOnly && <label><input type="radio" name={`slot-source-${selectedSlot}`} checked={config.slots[selectedSlot].source === 'library'} onChange={() => changeSource(selectedSlot, 'library')} /><span>Librería</span></label>}<label><input type="radio" name={`slot-source-${selectedSlot}`} checked={config.slots[selectedSlot].source === 'figma'} onChange={() => changeSource(selectedSlot, 'figma')} /><span>Figma</span></label><label><input type="radio" name={`slot-source-${selectedSlot}`} checked={config.slots[selectedSlot].source === 'prompt'} onChange={() => changeSource(selectedSlot, 'prompt')} /><span>Mi idea</span></label></div></fieldset>
+            {config.slots[selectedSlot].source === 'library' ? <>
+            <label>Patrón visual<select value={config.slots[selectedSlot].variant} onChange={(event) => changeVariant(selectedSlot, event.target.value as SlotVariant)}>{Object.entries(variantNames).map(([value, name]) => <option value={value} key={value}>{name}</option>)}</select></label>
+            {config.slots[selectedSlot].variant === 'recommendationCard' ? <RecommendationCardEditor slot={config.slots[selectedSlot]} onChange={(patch) => updateSlot(selectedSlot, patch)} /> : config.slots[selectedSlot].variant in extraPatternDefaults ? <ExtraPatternEditor slot={config.slots[selectedSlot]} onChange={(patch) => updateSlot(selectedSlot, patch)} /> : config.slots[selectedSlot].variant === 'value' ? <>
+              <label>Columnas<select value={config.slots[selectedSlot].columns} onChange={(event) => changeValueColumns(selectedSlot, Number(event.target.value) as MetricColumns)}><option value={1}>1</option><option value={2}>2</option><option value={3}>3</option><option value={4}>4</option></select></label>
+              {config.slots[selectedSlot].columns > 1 ? <fieldset className="reputation-demo__metric-fields"><legend>Datos de las {config.slots[selectedSlot].columns} columnas</legend>{config.slots[selectedSlot].metrics.slice(0, config.slots[selectedSlot].columns).map((metric, index) => <div className="reputation-demo__metric-editor" key={index}><strong>Dato {index + 1}</strong><label>Valor<input value={metric.value} onChange={(event) => updateMetric(selectedSlot, index, { value: event.target.value })} /></label><label>Etiqueta<input value={metric.label} onChange={(event) => updateMetric(selectedSlot, index, { label: event.target.value })} /></label><MetricStatusControl status={metric.status} label={`Indicador del dato ${index + 1}`} onChange={(status) => updateMetric(selectedSlot, index, { status })} /><MetricColorControl color={metric.color} status={metric.status} label={`Color del dato ${index + 1}`} onChange={(color) => updateMetric(selectedSlot, index, { color })} /></div>)}</fieldset> : <><label>Valor<input value={config.slots[selectedSlot].value} onChange={(event) => updateSlot(selectedSlot, { value: event.target.value })} /></label><label>Etiqueta<input value={config.slots[selectedSlot].label} onChange={(event) => updateSlot(selectedSlot, { label: event.target.value })} /></label><MetricStatusControl status={config.slots[selectedSlot].metrics[0].status} label="Indicador del dato 1" onChange={(status) => updateMetric(selectedSlot, 0, { status })} /><MetricColorControl color={config.slots[selectedSlot].metrics[0].color} status={config.slots[selectedSlot].metrics[0].status} label="Color del dato 1" onChange={(color) => updateMetric(selectedSlot, 0, { color })} /></>}
+            </> : config.slots[selectedSlot].variant === 'reputation' ? <><label>Título del estado<input value={config.slots[selectedSlot].label} onChange={(event) => updateSlot(selectedSlot, { label: event.target.value })} /></label><label>Estado<select value={config.slots[selectedSlot].tone} onChange={(event) => updateSlot(selectedSlot, { tone: event.target.value as ReputationTone })}><option value="green">Verde</option><option value="yellow">Amarillo</option><option value="red">Rojo</option></select></label><label>Texto de apoyo (opcional)<input value={config.slots[selectedSlot].description} onChange={(event) => updateSlot(selectedSlot, { description: event.target.value })} /></label></> : config.slots[selectedSlot].variant === 'gauge' ? <><label>Texto<input value={config.slots[selectedSlot].label} onChange={(event) => updateSlot(selectedSlot, { label: event.target.value })} /></label><label>Enlace<input value={config.slots[selectedSlot].value} onChange={(event) => updateSlot(selectedSlot, { value: event.target.value })} /></label><label>Estado<input value={config.slots[selectedSlot].description} onChange={(event) => updateSlot(selectedSlot, { description: event.target.value })} /></label></> : <><label>Badge<input value={config.slots[selectedSlot].label} onChange={(event) => updateSlot(selectedSlot, { label: event.target.value })} /></label><label>Título<input value={config.slots[selectedSlot].value} onChange={(event) => updateSlot(selectedSlot, { value: event.target.value })} /></label><label>Descripción<input value={config.slots[selectedSlot].description} onChange={(event) => updateSlot(selectedSlot, { description: event.target.value })} /></label></>}
+            </> : config.slots[selectedSlot].source === 'figma' ? <div className="reputation-demo__free-fields">
+              <label>Link al frame de Figma (opcional para la demo)
+                <input type="url" value={config.slots[selectedSlot].figmaUrl} placeholder="https://www.figma.com/design/...?...node-id=..." onChange={(event) => {
+                  const slot = config.slots[selectedSlot]
+                  const keepDemoImage = slot.figmaImageSource === 'upload'
+                  updateSlot(selectedSlot, { figmaUrl: event.target.value, enabled: keepDemoImage && slot.enabled, figmaImageDataUrl: keepDemoImage ? slot.figmaImageDataUrl : '', figmaImageSource: keepDemoImage ? 'upload' : '' })
+                  setFigmaImportError('')
+                  setFigmaNeedsConnection(false)
+                }} aria-describedby="reputation-demo-figma-help" />
+              </label>
+              {config.slots[selectedSlot].figmaUrl && !validFigmaUrl(config.slots[selectedSlot].figmaUrl) && <p className="reputation-demo__field-error" role="status">Copia el enlace de un frame o componente seleccionado en un archivo de diseño de Figma.</p>}
+              {validFigmaUrl(config.slots[selectedSlot].figmaUrl) && <a className="reputation-demo__figma-link" href={config.slots[selectedSlot].figmaUrl} target="_blank" rel="noreferrer">Abrir el diseño en Figma ↗</a>}
+              {window.location.protocol !== 'file:' && validFigmaUrl(config.slots[selectedSlot].figmaUrl) && <button type="button" className="reputation-demo__apply-idea" disabled={figmaImportingSlot !== null} onClick={() => void addFigmaSlot(selectedSlot)}>{figmaImportingSlot === selectedSlot ? 'Agregando imagen…' : 'Agregar desde Figma a la card'}</button>}
+              <div className="reputation-demo__figma-demo-upload">
+                <strong>Demo en este HTML · sin conexión</strong>
+                <p>Exporta el frame de Figma como PNG. Luego elige esa imagen para verla dentro de la card.</p>
+                <label>Imagen del frame (PNG, JPG o WebP; máximo 2 MB)
+                  <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => {
+                    const file = event.target.files?.[0]
+                    setFigmaDemoFile(file ? { slotId: selectedSlot, file } : null)
+                    setFigmaImportError('')
+                  }} />
+                </label>
+                {figmaDemoFile?.slotId === selectedSlot && <p className="reputation-demo__file-name">Seleccionada: {figmaDemoFile.file.name}</p>}
+                <button type="button" className="reputation-demo__apply-idea" disabled={figmaDemoFile?.slotId !== selectedSlot || figmaImportingSlot !== null} onClick={() => void addFigmaDemoImage(selectedSlot)}>{figmaImportingSlot === selectedSlot ? 'Agregando imagen…' : 'Agregar imagen a la card'}</button>
+                {config.slots[selectedSlot].enabled && config.slots[selectedSlot].figmaImageSource === 'upload' && <p role="status">Imagen de demo agregada al slot. No se obtuvo automáticamente desde el enlace.</p>}
+              </div>
+              {figmaImportError && <p className="reputation-demo__field-error" role="alert">{figmaImportError}</p>}
+              {figmaNeedsConnection && window.location.protocol !== 'file:' && <a className="reputation-demo__figma-link" href="/api/figma/connect?returnTo=/">Conectar Figma</a>}
+              <p id="reputation-demo-figma-help">{window.location.protocol === 'file:' ? 'Este HTML no descarga imágenes privadas de Figma desde el enlace. Para esta demo, usa la imagen exportada arriba.' : 'Con Figma conectado puedes agregar el diseño desde el enlace; también puedes subir una imagen para la demo.'}</p>
+            </div> : <div className="reputation-demo__free-fields">
+              <div className="reputation-demo__idea-intro"><h3>{slotOnly ? 'Construye el contenido del slot' : 'Convierte tu idea en una card'}</h3><p>Cuenta qué quieres lograr y el Builder preparará una propuesta editable con los patrones disponibles de Summary.</p><p className="reputation-demo__local-note">{localAiReady ? 'IA local activa: explora composiciones sin enviar tu idea fuera de este equipo.' : 'Motor de reglas local: usa las composiciones base de Summary.'}</p>{config.slots[selectedSlot].usesLibraryVariant && <p className="reputation-demo__local-note">Contenido actual: <strong>{variantName(config.slots[selectedSlot].variant)}</strong> de Summary. Puedes conservarlo o crear otra propuesta con Mi idea.</p>}</div>
+              <label>{slotOnly ? 'Tu idea para el slot' : 'Tu idea para la card'}<textarea ref={ideaPromptRef} rows={6} maxLength={700} placeholder={'Describe:\n• qué necesitas mostrar o resolver\n• los datos, período o comparación clave\n• la acción que debería seguir la persona'} value={config.ideaPrompt} onChange={(event) => { cancelGeneration(); ideaAlternativeIndex.current = 0; setIdeaFeedbackOpen(false); setConfig((current) => ({ ...current, ideaPrompt: event.target.value })) }} /></label>
+              <p className="reputation-demo__local-note">{localAiReady ? 'La propuesta se procesa con el modelo instalado en este equipo; no se envía a un proveedor externo.' : 'La propuesta se interpreta con reglas locales de Summary.'}</p>
+              <button type="button" className="reputation-demo__apply-idea" disabled={!config.ideaPrompt.trim() || generatingSlot !== null} onClick={() => void generateSketch(selectedSlot, hasIdeaDraft ? ideaAlternativeIndex.current + 1 : 0)}>{generatingSlot !== null ? 'Preparando propuesta…' : hasIdeaDraft ? 'Crear otra propuesta' : 'Crear mi propuesta'}</button>
+              {draftWarnings(config).length > 0 && <div className="reputation-demo__draft-warnings" role="status"><strong>Antes de compartir, completa:</strong><ul>{draftWarnings(config).map((warning) => <li key={warning}>{warning}</li>)}</ul></div>}
+            </div>}
+            {config.slots[selectedSlot].source === 'prompt' && config.slots[selectedSlot].sketch && <div className="reputation-demo__free-fields reputation-demo__sketch-edit">
+              <label>Título del contenido<input value={config.slots[selectedSlot].sketch.title} onChange={(event) => updateSlot(selectedSlot, { sketch: { ...config.slots[selectedSlot].sketch!, title: event.target.value } })} /></label>
+              {(config.slots[selectedSlot].sketch.kind === 'metric' || config.slots[selectedSlot].sketch.kind === 'chart' || config.slots[selectedSlot].sketch.kind === 'followers') && <><label>Valor<input value={config.slots[selectedSlot].sketch.value} onChange={(event) => updateSlot(selectedSlot, { sketch: { ...config.slots[selectedSlot].sketch!, value: event.target.value } })} /></label><label>Texto de apoyo<input value={config.slots[selectedSlot].sketch.support} onChange={(event) => updateSlot(selectedSlot, { sketch: { ...config.slots[selectedSlot].sketch!, support: event.target.value } })} /></label></>}
+              {config.slots[selectedSlot].sketch.kind === 'metric' && <><label>Período<input value={config.slots[selectedSlot].sketch.period} onChange={(event) => updateSlot(selectedSlot, { sketch: { ...config.slots[selectedSlot].sketch!, period: event.target.value } })} /></label><label>Variación (opcional)<input value={config.slots[selectedSlot].sketch.change} onChange={(event) => updateSlot(selectedSlot, { sketch: { ...config.slots[selectedSlot].sketch!, change: event.target.value } })} /></label></>}
+              {config.slots[selectedSlot].sketch.kind === 'period-list' && config.slots[selectedSlot].sketch.items.map((item, index) => <div className="reputation-demo__draft-item" key={index}><label>Dato {index + 1}<input value={item.value} onChange={(event) => updateSlot(selectedSlot, { sketch: { ...config.slots[selectedSlot].sketch!, items: config.slots[selectedSlot].sketch!.items.map((entry, entryIndex) => entryIndex === index ? { ...entry, value: event.target.value } : entry) } })} /></label><label>Etiqueta<input value={item.label} onChange={(event) => updateSlot(selectedSlot, { sketch: { ...config.slots[selectedSlot].sketch!, items: config.slots[selectedSlot].sketch!.items.map((entry, entryIndex) => entryIndex === index ? { ...entry, label: event.target.value } : entry) } })} /></label></div>)}
+              {config.slots[selectedSlot].sketch.kind === 'recommendation' && <><label>Descripción<input value={config.slots[selectedSlot].sketch.support} onChange={(event) => updateSlot(selectedSlot, { sketch: { ...config.slots[selectedSlot].sketch!, support: event.target.value } })} /></label><label>Acción de la recomendación<input value={config.slots[selectedSlot].sketch.cta} onChange={(event) => updateSlot(selectedSlot, { sketch: { ...config.slots[selectedSlot].sketch!, cta: event.target.value } })} /></label></>}
+              {config.slots[selectedSlot].sketch.kind === 'gauge' && <label>Nivel de muestra, de 0 a 100<input type="number" min="0" max="100" value={config.slots[selectedSlot].sketch.gaugeValue} onChange={(event) => updateSlot(selectedSlot, { sketch: { ...config.slots[selectedSlot].sketch!, gaugeValue: Math.max(0, Math.min(100, Number(event.target.value))) } })} /></label>}
+            </div>}
+            <button className="reputation-demo__remove" type="button" onClick={() => { cancelGeneration(); updateSlot(selectedSlot, { enabled: false, figmaImageDataUrl: '', figmaImageSource: '' }); setSelected(null) }}>Quitar contenido del slot</button>
+          </div> : selected === 'title' ? <div className="reputation-demo__fields"><label>Título<input value={config.title} placeholder="Title" onChange={(event) => setConfig((current) => ({ ...current, title: event.target.value, autoTitle: false }))} /></label></div> : selected === 'footer' ? <div className="reputation-demo__fields"><label>Texto del CTA<input value={config.footer} onChange={(event) => setConfig((current) => ({ ...current, footer: event.target.value, autoFooter: false }))} /></label></div> : <div className="reputation-demo__inspector-empty"><strong>Primero agrega un slot desde Construcción de la card.</strong><p>Al seleccionarlo, aquí eliges si completarlo desde Librería, Figma o Mi idea.</p></div>
+
+  if (slotOnly) {
+    const slot = config.slots['slot-1']
+    const hasContent = slot.enabled && (slot.source === 'figma' ? Boolean(slot.figmaImageDataUrl) : slot.source === 'prompt' ? slot.promptApplied || slot.usesLibraryVariant : true)
+    const preview = hasContent || generatingSlot ? <div className={`mobile-group-preview mobile-informative-free reputation-demo__filled-slot reputation-demo__filled-slot--${slot.variant}`} data-slot-source={slot.source} data-slot-variant={slot.variant} data-tone={slot.tone} aria-label="Información complementaria: slot libre">
+      {slot.source === 'figma' && slot.figmaImageDataUrl
+        ? <div className="reputation-demo__figma-render"><img src={slot.figmaImageDataUrl} alt="Diseño de Figma del slot informativo" /></div>
+        : <SlotPreviewContent slot={slot} isGenerating={Boolean(generatingSlot)} generationStep={generationStep} />}
+    </div> : null
+    return slotOnly.children({ preview, editor: <div className="mobile-informative-slot__free-editor">{slotEditor}<p className="mobile-section-editor-note" role="status">{notice}</p></div>, hasContent, complete: !generatingSlot && draftWarnings(config).length === 0, activate: () => fillSlot('slot-1') })
+  }
+
+  if (device === 'mobile' && elementKind === 'mobile-section' && !monthlyFrame) {
+    return <MobileSectionBuilder onElementChange={changeElementKind} onDesktop={() => {
+      setDevice('desktop')
+      window.requestAnimationFrame(() => document.querySelector<HTMLInputElement>('input[name="reputation-demo-device"]:checked')?.focus())
+    }} exportStyles={`${contextStyles}\n${demoStyles}`} freeSlotBuilder={MobileFreeSlotBuilder} />
+  }
+
+  if (device === 'mobile' && mobileCards.kind !== 'free' && !monthlyFrame) {
+    const kind = mobileCards.kind
+    return <MobileCardBuilder kind={kind} draft={mobileCards.drafts[kind]} onSelect={selectMobileCard} onChange={(draft) => updateMobileCards({ ...mobileCards, drafts: { ...mobileCards.drafts, [kind]: draft } })} onElementChange={changeElementKind} onDesktop={() => {
+      setDevice('desktop')
+      window.requestAnimationFrame(() => document.querySelector<HTMLInputElement>('input[name="reputation-demo-device"]:checked')?.focus())
+    }} exportStyles={contextStyles} saveFailed={mobileCardsSaveFailed} />
+  }
 
   return (
     <section className="reputation-demo" aria-labelledby="reputation-demo-title">
@@ -1264,6 +1397,7 @@ export function ReputationDemoPage({ prefill = false, monthlyFrame }: { prefill?
       {builderStage === 'build' ? <>
       <div className="reputation-demo__layout">
         <aside className="reputation-demo__panel reputation-demo__palette" aria-labelledby="reputation-demo-slots-title">
+          {device === 'mobile' && !monthlyFrame && <><BuilderElementSelector value="card" onChange={changeElementKind} /><MobileCardSelector value="free" onChange={selectMobileCard} /></>}
           <div className="reputation-demo__panel-heading"><p className="eyebrow">1. Construye la card</p><h2 id="reputation-demo-slots-title">Slots configurados · {config.order.filter((id) => config.slots[id].enabled).length} de {config.order.length || 3}</h2><p>{config.order.length === 0 ? 'Agrega el primer slot para definir la estructura de la card.' : 'Los slots disponibles no cuentan como contenido hasta que los completes.'}</p></div>
           <ol className="reputation-demo__slot-list">
             {config.order.map((id) => {
@@ -1307,66 +1441,12 @@ export function ReputationDemoPage({ prefill = false, monthlyFrame }: { prefill?
               {(hasPreviewContent || monthlyFrame) && <button type="button" className={`reputation-demo__card-footer${selected === 'footer' ? ' is-selected' : ''}`} onClick={() => setSelected('footer')} aria-label={config.footer || 'Configurar la acción de la card'}><span>{config.footer || 'Agregar acción'}</span><span aria-hidden="true">›</span></button>}
             </article>
           </div>
-          <p className="reputation-demo__canvas-hint">Card Desktop: 270 px · Máximo tres slots. Pasa el cursor por uno para eliminarlo.</p>
+          <p className="reputation-demo__canvas-hint">Card {device === 'mobile' ? 'Mobile: 320 px' : 'Desktop: 270 px'} · Máximo tres slots. Pasa el cursor por uno para eliminarlo.</p>
         </section>
 
         <aside className="reputation-demo__panel reputation-demo__inspector" aria-labelledby="reputation-demo-properties-title">
           <div className="reputation-demo__panel-heading"><p className="eyebrow">2. Completa el contenido</p><h2 id="reputation-demo-properties-title">Propiedades</h2><p>{selectedSlot ? `Slot ${allSlotIds.indexOf(selectedSlot) + 1} · ${slotRoles[selectedSlot].name}` : selected === 'title' ? 'Título de la card' : selected === 'footer' ? 'Llamada a la acción' : 'Agrega y selecciona un slot para elegir su contenido.'}</p></div>
-          {selectedSlot ? <div className="reputation-demo__fields">
-            <fieldset className="reputation-demo__source-fields"><legend>¿Cómo quieres completar este slot?</legend><div className="reputation-demo__source-options"><label><input type="radio" name={`slot-source-${selectedSlot}`} checked={config.slots[selectedSlot].source === 'library'} onChange={() => changeSource(selectedSlot, 'library')} /><span>Librería</span></label><label><input type="radio" name={`slot-source-${selectedSlot}`} checked={config.slots[selectedSlot].source === 'figma'} onChange={() => changeSource(selectedSlot, 'figma')} /><span>Figma</span></label><label><input type="radio" name={`slot-source-${selectedSlot}`} checked={config.slots[selectedSlot].source === 'prompt'} onChange={() => changeSource(selectedSlot, 'prompt')} /><span>Mi idea</span></label></div></fieldset>
-            {config.slots[selectedSlot].source === 'library' ? <>
-            <label>Patrón visual<select value={config.slots[selectedSlot].variant} onChange={(event) => changeVariant(selectedSlot, event.target.value as SlotVariant)}>{Object.entries(variantNames).map(([value, name]) => <option value={value} key={value}>{name}</option>)}</select></label>
-            {config.slots[selectedSlot].variant === 'recommendationCard' ? <RecommendationCardEditor slot={config.slots[selectedSlot]} onChange={(patch) => updateSlot(selectedSlot, patch)} /> : config.slots[selectedSlot].variant in extraPatternDefaults ? <ExtraPatternEditor slot={config.slots[selectedSlot]} onChange={(patch) => updateSlot(selectedSlot, patch)} /> : config.slots[selectedSlot].variant === 'value' ? <>
-              <label>Columnas<select value={config.slots[selectedSlot].columns} onChange={(event) => changeValueColumns(selectedSlot, Number(event.target.value) as MetricColumns)}><option value={1}>1</option><option value={2}>2</option><option value={3}>3</option><option value={4}>4</option></select></label>
-              {config.slots[selectedSlot].columns > 1 ? <fieldset className="reputation-demo__metric-fields"><legend>Datos de las {config.slots[selectedSlot].columns} columnas</legend>{config.slots[selectedSlot].metrics.slice(0, config.slots[selectedSlot].columns).map((metric, index) => <div className="reputation-demo__metric-editor" key={index}><strong>Dato {index + 1}</strong><label>Valor<input value={metric.value} onChange={(event) => updateMetric(selectedSlot, index, { value: event.target.value })} /></label><label>Etiqueta<input value={metric.label} onChange={(event) => updateMetric(selectedSlot, index, { label: event.target.value })} /></label><MetricStatusControl status={metric.status} label={`Indicador del dato ${index + 1}`} onChange={(status) => updateMetric(selectedSlot, index, { status })} /><MetricColorControl color={metric.color} status={metric.status} label={`Color del dato ${index + 1}`} onChange={(color) => updateMetric(selectedSlot, index, { color })} /></div>)}</fieldset> : <><label>Valor<input value={config.slots[selectedSlot].value} onChange={(event) => updateSlot(selectedSlot, { value: event.target.value })} /></label><label>Etiqueta<input value={config.slots[selectedSlot].label} onChange={(event) => updateSlot(selectedSlot, { label: event.target.value })} /></label><MetricStatusControl status={config.slots[selectedSlot].metrics[0].status} label="Indicador del dato 1" onChange={(status) => updateMetric(selectedSlot, 0, { status })} /><MetricColorControl color={config.slots[selectedSlot].metrics[0].color} status={config.slots[selectedSlot].metrics[0].status} label="Color del dato 1" onChange={(color) => updateMetric(selectedSlot, 0, { color })} /></>}
-            </> : config.slots[selectedSlot].variant === 'reputation' ? <><label>Título del estado<input value={config.slots[selectedSlot].label} onChange={(event) => updateSlot(selectedSlot, { label: event.target.value })} /></label><label>Estado<select value={config.slots[selectedSlot].tone} onChange={(event) => updateSlot(selectedSlot, { tone: event.target.value as ReputationTone })}><option value="green">Verde</option><option value="yellow">Amarillo</option><option value="red">Rojo</option></select></label><label>Texto de apoyo (opcional)<input value={config.slots[selectedSlot].description} onChange={(event) => updateSlot(selectedSlot, { description: event.target.value })} /></label></> : config.slots[selectedSlot].variant === 'gauge' ? <><label>Texto<input value={config.slots[selectedSlot].label} onChange={(event) => updateSlot(selectedSlot, { label: event.target.value })} /></label><label>Enlace<input value={config.slots[selectedSlot].value} onChange={(event) => updateSlot(selectedSlot, { value: event.target.value })} /></label><label>Estado<input value={config.slots[selectedSlot].description} onChange={(event) => updateSlot(selectedSlot, { description: event.target.value })} /></label></> : <><label>Badge<input value={config.slots[selectedSlot].label} onChange={(event) => updateSlot(selectedSlot, { label: event.target.value })} /></label><label>Título<input value={config.slots[selectedSlot].value} onChange={(event) => updateSlot(selectedSlot, { value: event.target.value })} /></label><label>Descripción<input value={config.slots[selectedSlot].description} onChange={(event) => updateSlot(selectedSlot, { description: event.target.value })} /></label></>}
-            </> : config.slots[selectedSlot].source === 'figma' ? <div className="reputation-demo__free-fields">
-              <label>Link al frame de Figma (opcional para la demo)
-                <input type="url" value={config.slots[selectedSlot].figmaUrl} placeholder="https://www.figma.com/design/...?...node-id=..." onChange={(event) => {
-                  const slot = config.slots[selectedSlot]
-                  const keepDemoImage = slot.figmaImageSource === 'upload'
-                  updateSlot(selectedSlot, { figmaUrl: event.target.value, enabled: keepDemoImage && slot.enabled, figmaImageDataUrl: keepDemoImage ? slot.figmaImageDataUrl : '', figmaImageSource: keepDemoImage ? 'upload' : '' })
-                  setFigmaImportError('')
-                  setFigmaNeedsConnection(false)
-                }} aria-describedby="reputation-demo-figma-help" />
-              </label>
-              {config.slots[selectedSlot].figmaUrl && !validFigmaUrl(config.slots[selectedSlot].figmaUrl) && <p className="reputation-demo__field-error" role="status">Copia el enlace de un frame o componente seleccionado en un archivo de diseño de Figma.</p>}
-              {validFigmaUrl(config.slots[selectedSlot].figmaUrl) && <a className="reputation-demo__figma-link" href={config.slots[selectedSlot].figmaUrl} target="_blank" rel="noreferrer">Abrir el diseño en Figma ↗</a>}
-              {window.location.protocol !== 'file:' && validFigmaUrl(config.slots[selectedSlot].figmaUrl) && <button type="button" className="reputation-demo__apply-idea" disabled={figmaImportingSlot !== null} onClick={() => void addFigmaSlot(selectedSlot)}>{figmaImportingSlot === selectedSlot ? 'Agregando imagen…' : 'Agregar desde Figma a la card'}</button>}
-              <div className="reputation-demo__figma-demo-upload">
-                <strong>Demo en este HTML · sin conexión</strong>
-                <p>Exporta el frame de Figma como PNG. Luego elige esa imagen para verla dentro de la card.</p>
-                <label>Imagen del frame (PNG, JPG o WebP; máximo 2 MB)
-                  <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => {
-                    const file = event.target.files?.[0]
-                    setFigmaDemoFile(file ? { slotId: selectedSlot, file } : null)
-                    setFigmaImportError('')
-                  }} />
-                </label>
-                {figmaDemoFile?.slotId === selectedSlot && <p className="reputation-demo__file-name">Seleccionada: {figmaDemoFile.file.name}</p>}
-                <button type="button" className="reputation-demo__apply-idea" disabled={figmaDemoFile?.slotId !== selectedSlot || figmaImportingSlot !== null} onClick={() => void addFigmaDemoImage(selectedSlot)}>{figmaImportingSlot === selectedSlot ? 'Agregando imagen…' : 'Agregar imagen a la card'}</button>
-                {config.slots[selectedSlot].enabled && config.slots[selectedSlot].figmaImageSource === 'upload' && <p role="status">Imagen de demo agregada al slot. No se obtuvo automáticamente desde el enlace.</p>}
-              </div>
-              {figmaImportError && <p className="reputation-demo__field-error" role="alert">{figmaImportError}</p>}
-              {figmaNeedsConnection && window.location.protocol !== 'file:' && <a className="reputation-demo__figma-link" href="/api/figma/connect?returnTo=/">Conectar Figma</a>}
-              <p id="reputation-demo-figma-help">{window.location.protocol === 'file:' ? 'Este HTML no descarga imágenes privadas de Figma desde el enlace. Para esta demo, usa la imagen exportada arriba.' : 'Con Figma conectado puedes agregar el diseño desde el enlace; también puedes subir una imagen para la demo.'}</p>
-            </div> : <div className="reputation-demo__free-fields">
-              <div className="reputation-demo__idea-intro"><h3>Convierte tu idea en una card</h3><p>Cuenta qué quieres lograr y el Builder preparará una propuesta editable con los patrones disponibles de Summary.</p><p className="reputation-demo__local-note">{localAiReady ? 'IA local activa: explora composiciones sin enviar tu idea fuera de este equipo.' : 'Motor de reglas local: usa las composiciones base de Summary.'}</p>{config.slots[selectedSlot].usesLibraryVariant && <p className="reputation-demo__local-note">Componente sugerido: <strong>{variantName(config.slots[selectedSlot].variant)}</strong> de la Librería. Sigues en Mi idea para ajustar o crear otra alternativa.</p>}</div>
-              <label>Tu idea para la card<textarea ref={ideaPromptRef} rows={6} maxLength={700} placeholder={'Describe:\n• qué necesitas mostrar o resolver\n• los datos, período o comparación clave\n• la acción que debería seguir la persona'} value={config.ideaPrompt} onChange={(event) => { cancelGeneration(); ideaAlternativeIndex.current = 0; setIdeaFeedbackOpen(false); setConfig((current) => ({ ...current, ideaPrompt: event.target.value })) }} /></label>
-              <p className="reputation-demo__local-note">{localAiReady ? 'La propuesta se procesa con el modelo instalado en este equipo; no se envía a un proveedor externo.' : 'La propuesta se interpreta con reglas locales de Summary.'}</p>
-              <button type="button" className="reputation-demo__apply-idea" disabled={!config.ideaPrompt.trim() || generatingSlot !== null} onClick={() => void generateSketch(selectedSlot, hasIdeaDraft ? ideaAlternativeIndex.current + 1 : 0)}>{generatingSlot !== null ? 'Preparando propuesta…' : hasIdeaDraft ? 'Crear otra propuesta' : 'Crear mi propuesta'}</button>
-              {draftWarnings(config).length > 0 && <div className="reputation-demo__draft-warnings" role="status"><strong>Antes de compartir, completa:</strong><ul>{draftWarnings(config).map((warning) => <li key={warning}>{warning}</li>)}</ul></div>}
-            </div>}
-            {config.slots[selectedSlot].source === 'prompt' && config.slots[selectedSlot].sketch && <div className="reputation-demo__free-fields reputation-demo__sketch-edit">
-              <label>Título del contenido<input value={config.slots[selectedSlot].sketch.title} onChange={(event) => updateSlot(selectedSlot, { sketch: { ...config.slots[selectedSlot].sketch!, title: event.target.value } })} /></label>
-              {(config.slots[selectedSlot].sketch.kind === 'metric' || config.slots[selectedSlot].sketch.kind === 'chart' || config.slots[selectedSlot].sketch.kind === 'followers') && <><label>Valor<input value={config.slots[selectedSlot].sketch.value} onChange={(event) => updateSlot(selectedSlot, { sketch: { ...config.slots[selectedSlot].sketch!, value: event.target.value } })} /></label><label>Texto de apoyo<input value={config.slots[selectedSlot].sketch.support} onChange={(event) => updateSlot(selectedSlot, { sketch: { ...config.slots[selectedSlot].sketch!, support: event.target.value } })} /></label></>}
-              {config.slots[selectedSlot].sketch.kind === 'metric' && <><label>Período<input value={config.slots[selectedSlot].sketch.period} onChange={(event) => updateSlot(selectedSlot, { sketch: { ...config.slots[selectedSlot].sketch!, period: event.target.value } })} /></label><label>Variación (opcional)<input value={config.slots[selectedSlot].sketch.change} onChange={(event) => updateSlot(selectedSlot, { sketch: { ...config.slots[selectedSlot].sketch!, change: event.target.value } })} /></label></>}
-              {config.slots[selectedSlot].sketch.kind === 'period-list' && config.slots[selectedSlot].sketch.items.map((item, index) => <div className="reputation-demo__draft-item" key={index}><label>Dato {index + 1}<input value={item.value} onChange={(event) => updateSlot(selectedSlot, { sketch: { ...config.slots[selectedSlot].sketch!, items: config.slots[selectedSlot].sketch!.items.map((entry, entryIndex) => entryIndex === index ? { ...entry, value: event.target.value } : entry) } })} /></label><label>Etiqueta<input value={item.label} onChange={(event) => updateSlot(selectedSlot, { sketch: { ...config.slots[selectedSlot].sketch!, items: config.slots[selectedSlot].sketch!.items.map((entry, entryIndex) => entryIndex === index ? { ...entry, label: event.target.value } : entry) } })} /></label></div>)}
-              {config.slots[selectedSlot].sketch.kind === 'recommendation' && <><label>Descripción<input value={config.slots[selectedSlot].sketch.support} onChange={(event) => updateSlot(selectedSlot, { sketch: { ...config.slots[selectedSlot].sketch!, support: event.target.value } })} /></label><label>Acción de la recomendación<input value={config.slots[selectedSlot].sketch.cta} onChange={(event) => updateSlot(selectedSlot, { sketch: { ...config.slots[selectedSlot].sketch!, cta: event.target.value } })} /></label></>}
-              {config.slots[selectedSlot].sketch.kind === 'gauge' && <label>Nivel de muestra, de 0 a 100<input type="number" min="0" max="100" value={config.slots[selectedSlot].sketch.gaugeValue} onChange={(event) => updateSlot(selectedSlot, { sketch: { ...config.slots[selectedSlot].sketch!, gaugeValue: Math.max(0, Math.min(100, Number(event.target.value))) } })} /></label>}
-            </div>}
-            <button className="reputation-demo__remove" type="button" onClick={() => { cancelGeneration(); updateSlot(selectedSlot, { enabled: false, figmaImageDataUrl: '', figmaImageSource: '' }); setSelected(null) }}>Quitar contenido del slot</button>
-          </div> : selected === 'title' ? <div className="reputation-demo__fields"><label>Título<input value={config.title} placeholder="Title" onChange={(event) => setConfig((current) => ({ ...current, title: event.target.value, autoTitle: false }))} /></label></div> : selected === 'footer' ? <div className="reputation-demo__fields"><label>Texto del CTA<input value={config.footer} onChange={(event) => setConfig((current) => ({ ...current, footer: event.target.value, autoFooter: false }))} /></label></div> : <div className="reputation-demo__inspector-empty"><strong>Primero agrega un slot desde Construcción de la card.</strong><p>Al seleccionarlo, aquí eliges si completarlo desde Librería, Figma o Mi idea.</p></div>}
+          {slotEditor}
         </aside>
       </div>
       <aside className={`reputation-demo__readiness reputation-demo__readiness--${readiness.phase}`} aria-live="polite">

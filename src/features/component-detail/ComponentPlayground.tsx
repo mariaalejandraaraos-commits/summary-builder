@@ -9,6 +9,7 @@ import { BillingCard } from './BillingCard'
 import { RemainingPlayground } from './RemainingPlaygrounds'
 import { CreditScoringPlayground } from './CreditScoringPlayground'
 import { PriceCompetitivenessCard, type PriceCompetitivenessProduct, type PriceCompetitivenessState } from './PriceCompetitivenessCard'
+import { PublicationTasksPlayground } from './PublicationTasksPlayground'
 
 type Variant = 'Normal' | 'Loading' | 'No disponible'
 type Viewport = 'Desktop' | 'Mobile / Webview'
@@ -18,36 +19,6 @@ type TasksPlaygroundConfig = {
   groups: PublicationTaskGroup[]
   initialStates: Record<string, SubcardState>
   selectedGroupId: string
-}
-
-const publicationTaskGroups: PublicationTaskGroup[] = [
-  { id: 'question_task_card', title: 'Preguntas', value: '15', description: 'Por responder', summaryBadge: 'red', hasNavigation: true, tasks: [] },
-  { id: 'publication_task_card', title: 'Publicaciones', value: '+999', description: 'Por mejorar', summaryBadge: 'red', hasNavigation: true, tasks: [
-    { id: 'publication-catalog', text: 'Prioritarias para catálogo', badge: { text: '300', color: 'red' } },
-    { id: 'publication-stock', text: 'Sin stock', badge: { text: '500', color: 'red' } },
-    { id: 'publication-policy', text: 'Inactivas por incumplir políticas', badge: { text: '200', color: 'red' } },
-    { id: 'publication-pausing', text: 'Próximas a pausarse', badge: { text: '390', color: 'gray' } },
-  ], hideTasksUntilExpanded: true, showDetailsAction: true },
-  { id: 'full_task_card', title: 'Productos Full', value: '4', description: 'Por gestionar', summaryBadge: 'red', hasNavigation: true, tasks: [
-    { id: 'full-stock', text: 'Productos con stock bajo', badge: { text: '2', color: 'red' } },
-    { id: 'full-reception', text: 'Ingresos pendientes', badge: { text: '2', color: 'gray' } },
-  ], hideTasksUntilExpanded: true, showDetailsAction: true },
-  { id: 'pricing_automation_task_card', title: 'Precios', value: '4', description: 'Por gestionar', summaryBadge: 'red', hasNavigation: true, tasks: [
-    { id: 'pricing-competition', text: 'Precios poco competitivos', badge: { text: '3', color: 'red' } },
-    { id: 'pricing-rules', text: 'Reglas por revisar', badge: { text: '1', color: 'gray' } },
-  ], hideTasksUntilExpanded: true, showDetailsAction: true },
-  { id: 'advertising_task_card', title: 'Publicidad', value: '20', description: 'Sugerencias', hasNavigation: true, tasks: [
-    { id: 'advertising-budget', text: 'Campañas para optimizar', badge: { text: '12', color: 'gray' } },
-    { id: 'advertising-opportunities', text: 'Oportunidades de crecimiento', badge: { text: '8', color: 'gray' } },
-  ], hideTasksUntilExpanded: true, showDetailsAction: true },
-]
-
-const publicationInitialStates: Record<string, SubcardState> = {
-  question_task_card: 'Plegada con Urgentes',
-  publication_task_card: 'Plegada con Urgentes',
-  full_task_card: 'Plegada con Urgentes',
-  pricing_automation_task_card: 'Plegada con Urgentes',
-  advertising_task_card: 'Plegada Sin Urgentes',
 }
 
 const salesTaskGroups: PublicationTaskGroup[] = [
@@ -85,12 +56,6 @@ const salesTaskGroups: PublicationTaskGroup[] = [
 const salesInitialStates: Record<string, SubcardState> = {
   post_sales_task_card: 'Plegada Sin Urgentes',
   sales_task_card: 'Plegada Sin Urgentes',
-}
-
-const publicationConfig: TasksPlaygroundConfig = {
-  groups: publicationTaskGroups,
-  initialStates: publicationInitialStates,
-  selectedGroupId: 'publication_task_card',
 }
 
 const salesConfig: TasksPlaygroundConfig = {
@@ -426,7 +391,7 @@ function BillingPlayground({ component }: { component: SummaryComponent }) {
 }
 
 export function ComponentPlayground({ component }: { component: SummaryComponent }) {
-  if (component.id === 'publication-tasks') return <TasksPlayground component={component} config={publicationConfig} />
+  if (component.id === 'publication-tasks') return <PublicationTasksPlayground component={component} />
   if (component.id === 'sales-tasks') return <TasksPlayground component={component} config={salesConfig} />
   if (component.id === 'reputation') return <ReputationPlayground component={component} />
   if (component.id === 'news') return <NewsPlayground component={component} />

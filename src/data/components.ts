@@ -10,7 +10,7 @@ const sharedMetadata = {
 }
 
 export const components: SummaryComponent[] = [
-  { id: 'publication-tasks', name: 'Pendientes en tus publicaciones', description: 'Agrupa tareas relacionadas con las publicaciones.', category: 'Pendientes', ...sharedMetadata, templatesCount: 1 },
+  { id: 'publication-tasks', name: 'Pendientes en tus publicaciones', description: 'Agrupa tareas relacionadas con las publicaciones.', category: 'Pendientes', ...sharedMetadata, templatesCount: 1, updatedAt: '26 oct 2026' },
   { id: 'sales-tasks', name: 'Pendientes en tus ventas', description: 'Agrupa tareas relacionadas con ventas y operaciones.', category: 'Pendientes', ...sharedMetadata },
   { id: 'reputation', name: 'Reputación', description: 'Resume el estado de reputación de la cuenta.', category: 'Negocio', ...sharedMetadata },
   { id: 'news', name: 'Novedades', description: 'Presenta actualizaciones relevantes para la persona usuaria.', category: 'Contenido', ...sharedMetadata },

@@ -12,6 +12,7 @@ type ContextExportOptions = {
   context: HTMLElement | null
   title: string
   styles: string
+  scope?: 'card-context' | 'mobile-section' | 'mobile-card'
 }
 
 function escapeHtml(value: string) {
@@ -75,9 +76,9 @@ ${styles}
 .review-visual-root { display: block; min-height: 0; }
 .review-stage { min-height: 450px; display: grid; place-items: start center; padding: 55px 16px; border: 1px solid #e1e5ea; background-color: #f1f2f4; background-image: radial-gradient(circle, #b8bec8 1.1px, transparent 1.2px); background-size: 17px 17px; border-radius: 10px; }
 .review-stage .reputation-demo__card { flex: none; }
-.review-stage[data-device="mobile"] .reputation-demo__card { width: min(340px, 100%); }
+.review-stage[data-device="mobile"] .reputation-demo__card { width: min(320px, 100%); }
 .review-visual-root .visual-card { width: min(270px, 100%); }
-.review-visual-root.visual-card-editor--mobile .visual-card { width: min(340px, 100%); }
+.review-visual-root.visual-card-editor--mobile .visual-card { width: min(320px, 100%); }
 .reputation-demo__card-header .review-card-title { display: block; width: 100%; color: #191919; font-size: 14px; font-weight: 600; }
 .visual-card__header .visual-card__title { display: block; min-height: 0; border: 0; }
 .review-stage .reputation-demo__empty-slot { cursor: default; }
@@ -119,18 +120,18 @@ ${styles}
   return true
 }
 
-export function downloadContextHtml({ context, title, styles }: ContextExportOptions) {
+export function downloadContextHtml({ context, title, styles, scope = 'card-context' }: ContextExportOptions) {
   if (!context) return false
-  const displayTitle = title.trim() || 'Nueva card'
+  const displayTitle = title.trim() || (scope === 'mobile-section' ? 'Nueva sección' : 'Nueva card')
   const clone = context.cloneNode(true) as HTMLElement
-  clone.querySelectorAll('input, label.visually-hidden').forEach((element) => element.remove())
+  clone.querySelectorAll('input, label.visually-hidden, [data-builder-only]').forEach((element) => element.remove())
   clone.querySelectorAll('.is-selected, .is-over').forEach((element) => element.classList.remove('is-selected', 'is-over'))
   const html = `<!doctype html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escapeHtml(displayTitle)} · Revisión en contexto</title>
+<title>${escapeHtml(displayTitle)} · ${scope !== 'card-context' ? 'Revisión en mobile' : 'Revisión en contexto'}</title>
 <style>
 :root { color-scheme: light; font-family: Arial, Helvetica, sans-serif; }
 * { box-sizing: border-box; }
@@ -149,7 +150,7 @@ ${styles}
 <main class="review-context-page">
   <header class="review-context-heading"><p>Summary Builder · Propuesta para revisión</p><h1>${escapeHtml(displayTitle)}</h1></header>
   ${clone.outerHTML}
-  <p class="review-context-note">La propuesta incluye la revisión de la card dentro del Template desktop y su adaptación a mobile. Verifica los datos antes de usarla; esta demo no certifica cumplimiento de Summary o Andes X.</p>
+  <p class="review-context-note">${scope === 'mobile-card' ? 'Propuesta de card para mobile con contenido de ejemplo editable. Verifica los datos antes de usarla.' : scope === 'mobile-section' ? 'Propuesta de sección agrupadora para mobile. Verifica los datos y las condiciones de cada elemento antes de usarla.' : 'La propuesta incluye la revisión de la card dentro del Template desktop y su adaptación a mobile. Verifica los datos antes de usarla; esta demo no certifica cumplimiento de Summary o Andes X.'}</p>
 </main>
 </body>
 </html>`
@@ -157,7 +158,7 @@ ${styles}
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
-  link.download = `${displayTitle.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 72) || 'nueva-card'}-contexto.html`
+  link.download = `${displayTitle.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 72) || (scope === 'mobile-section' ? 'nueva-seccion' : 'nueva-card')}-${scope !== 'card-context' ? 'mobile' : 'contexto'}.html`
   document.body.appendChild(link)
   link.click()
   link.remove()
